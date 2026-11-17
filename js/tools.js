@@ -295,6 +295,7 @@ function viewPosition(id) {
     <div class="btn-row">
       <button class="btn" data-act="pdCopyHM" type="button">📋 Copy gửi HM xác nhận</button>
       <button class="btn primary" data-act="pdSave" type="button">💾 Lưu vị trí</button></div>
+    <div style="text-align:right;margin-top:6px">${backupBtn()}</div>
     ${!isNew ? `<div style="text-align:center;margin-top:12px"><button class="btn ghost" style="color:var(--bad)" data-act="pdDelete" type="button">🗑 Xoá vị trí này</button></div>` : ""}</div>`;
   if (!isNew) {
     const q = "?pos=" + encodeURIComponent(d.posId);
@@ -420,7 +421,8 @@ function resultHtml(scope) {
     <div class="chips">${TARGETS[scope].map(t => `<button class="chip ${d.target === t ? "on" : ""}" data-act="setTarget" data-scope="${scope}" data-val="${esc(t)}" type="button">${t === "Giữ nguyên" ? `Giữ nguyên (${esc(cur)})` : esc(t)}</button>`).join("")}</div>
     <div class="btn-row" style="margin-top:12px">
       ${scope === "sv" ? `<button class="btn" data-act="svSave" data-hm="1" type="button">💾 Lưu & tạo tóm tắt gửi HM</button>` : ""}
-      <button class="btn primary" data-act="${scope}Save" type="button">💾 Lưu kết quả</button></div></div>`;
+      <button class="btn primary" data-act="${scope}Save" type="button">💾 Lưu kết quả</button></div>
+    <div style="text-align:right;margin-top:6px">${backupBtn()}</div></div>`;
 }
 function miniScoreHtml(scope) {
   const d = D[scope], pos = findPos(d.posId);

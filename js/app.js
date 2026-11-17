@@ -253,6 +253,8 @@ function viewHome() {
 
   if (!Store.state.hasData && isConnected()) return html + loadingBlock();
 
+  html += onboardingCard();
+
   // Phễu
   const count = s => cands.filter(c => stageOf(c) === s).length;
   const max = Math.max(1, ...MAIN_STAGES.map(count));
@@ -295,13 +297,7 @@ function soonBlock(ico, title, items) {
     <p class="muted" style="margin-top:6px">${title}</p>
     <div class="soon-list">${items.map(i => `<div>${i}</div>`).join("")}</div></div>`;
 }
-function viewLearn() {
-  return pageHead("📘 Học", "ôn lại kiến thức tuyển dụng theo 6 bước, mỗi bước có ví dụ và câu đố nhanh.") +
-    soonBlock("📘", "Kiến thức sẽ chia theo 6 bước, đọc 3 phút/bước:", [
-      "B1 — Chân dung ứng viên & khai thác quản lý (HM)", "B2 — Viết JD & tin đăng (AIDA)", "B3 — Tạo nguồn & nghiên cứu thị trường",
-      "B4 — Phiếu điểm & lọc CV (CWC)", "B5 — Sơ vấn & phỏng vấn (STAR)", "B6 — Quản lý & bàn giao HM"]);
-}
-/* viewTools, viewPositions, viewPosition: xem js/tools.js (Pha 2) */
+/* viewLearn: xem js/learn.js (Pha 4) · viewTools, viewPositions, viewPosition: xem js/tools.js (Pha 2) */
 
 /* ---------------- DANH SÁCH ỨNG VIÊN ---------------- */
 function filteredCandidates() {
@@ -384,6 +380,7 @@ function viewCandidate(id) {
   const history = Array.isArray(asObj(c.chiTiet).lichSu) ? asObj(c.chiTiet).lichSu : [];
 
   let html = `<a class="back" href="#/candidates">← Danh sách ứng viên</a>`;
+  html += `<p class="howto" style="margin:0 0 12px"><span><b>Làm gì ở đây:</b> xem điểm & bằng chứng, chuyển ứng viên sang bước tiếp, gửi HM hoặc từ chối tử tế. Mọi thay đổi tự lưu lên Sheet.</span></p>`;
   html += `<div class="card"><div class="profile-head"><span class="avatar">${esc(initials(candName(c)))}</span>
     <div style="min-width:0"><h1>${esc(candName(c))}</h1><div class="muted">${esc(posName(c.posId))}</div><div style="margin-top:4px">${stageBadge(stage)}</div></div></div>`;
 
@@ -431,7 +428,7 @@ function viewCandidate(id) {
 
   // Ghi chú
   html += `<div class="card"><div class="card-head"><h2>Ghi chú</h2></div>
-    <textarea class="input" id="noteInput" data-keep="note-${esc(c.candId)}" placeholder="VD: 2 năm bán hàng thời trang, nhà ở Gò Vấp, đi làm được ngay từ 01/12. (Ghi sự việc, con số — đừng ghi “tốt/đẹp”.)">${esc(c.ghiChu)}</textarea>
+    <textarea class="input" id="noteInput" data-legal-check data-keep="note-${esc(c.candId)}" placeholder="VD: 2 năm bán hàng thời trang, đi làm được ngay từ 01/12, làm được ca tối. (Ghi sự việc, con số — đừng ghi “tốt/đẹp”.)">${esc(c.ghiChu)}</textarea>${legalSlot("noteInput", c.ghiChu)}
     <div class="btn-row" style="margin-top:10px"><button class="btn primary" data-act="saveNote" data-id="${esc(c.candId)}" type="button">Lưu ghi chú</button></div></div>`;
 
   // Lịch sử
@@ -534,7 +531,7 @@ function openCandidateForm(c, onSaved) {
       <div class="chips">${SOURCES.map(s => `<button class="chip ${s === M.nguon ? "on" : ""}" data-act="pickChip" data-group="nguon" data-val="${esc(s)}" type="button">${esc(s)}</button>`).join("")}</div></div>
     <div class="field"><span class="field-label">TA phụ trách ${tip("ta")}</span>
       <div class="chips">${tas.map(t => `<button class="chip ${t === M.ta ? "on" : ""}" data-act="pickChip" data-group="ta" data-val="${esc(t)}" type="button">${esc(t)}</button>`).join("")}</div></div>
-    ${isNew ? `<label class="field"><span>Ghi chú (tuỳ chọn)</span><textarea id="f_ghiChu" placeholder="VD: 1 năm bán hàng ở cửa hàng giày, ở Thủ Đức, làm được ca tối. (Ghi sự việc, con số.)"></textarea></label>` : ""}
+    ${isNew ? `<label class="field"><span>Ghi chú (tuỳ chọn)</span><textarea id="f_ghiChu" data-legal-check placeholder="VD: 1 năm bán hàng ở cửa hàng giày, làm được ca tối. (Ghi sự việc, con số.)"></textarea></label>${legalSlot("f_ghiChu", "")}` : ""}
     <div class="btn-row"><button class="btn" data-act="closeModal" type="button">Huỷ</button>
       <button class="btn primary" data-act="saveCandidateForm" type="button">${isNew ? "Lưu ứng viên" : "Lưu thay đổi"}</button></div>`);
   setTimeout(() => { const el = $("#f_hoTen"); if (el && window.innerWidth >= 700) el.focus(); }, 50);
@@ -563,7 +560,7 @@ function openStageModal(id) {
     ${ALL_STAGES.map((s, i) => `${i === MAIN_STAGES.length ? `<div class="field-label" style="margin:14px 0 8px">Nhánh phụ</div>` : ""}
       <button class="stage-option ${s === cur ? "cur" : ""}" style="--c:${STAGE_META[s].color}" data-act="pickStage" data-val="${esc(s)}" type="button">
         <span class="sw"></span><span><div class="t">${esc(s)}${s === cur ? " (hiện tại)" : ""}</div><div class="d">${esc(STAGE_META[s].desc)}</div></span></button>`).join("")}
-    <label class="field" style="margin-top:10px"><span>Lý do / ghi chú (tuỳ chọn)</span><input id="stageNote" placeholder="VD: HM hẹn phỏng vấn 9h sáng thứ 5" autocomplete="off"></label>`);
+    <label class="field" style="margin-top:10px"><span>Lý do / ghi chú (tuỳ chọn)</span><input id="stageNote" data-legal-check placeholder="VD: HM hẹn phỏng vấn 9h sáng thứ 5" autocomplete="off"></label>${legalSlot("stageNote", "")}`);
 }
 function changeStage(id, newStage, note = "") {
   const c = findCand(id); if (!c) return;
@@ -634,7 +631,7 @@ function openHM(id) {
   const stage = stageOf(c);
   openModal("📤 Chuyển HM", `
     <p class="howto" style="margin:0 0 12px"><span><b>HM</b> (quản lý trực tiếp) rất bận → gửi tóm tắt ngắn, có điểm & bằng chứng, kèm hạn phản hồi. Có thể sửa chữ trước khi copy.</span></p>
-    <textarea class="preview" id="hmText">${esc(hmSummary(c))}</textarea>
+    <textarea class="preview" id="hmText" data-legal-check>${esc(hmSummary(c))}</textarea>${legalSlot("hmText", hmSummary(c))}
     <div class="btn-row" style="margin-top:12px">
       <button class="btn" data-act="copyFrom" data-src="hmText" type="button">📋 Copy</button>
       ${stage !== "Chuyển HM" ? `<button class="btn primary" data-act="copyHMAndMove" type="button">📋 Copy & chuyển trạng thái → Chuyển HM</button>` : ""}</div>`);
@@ -649,7 +646,7 @@ function openPool(id) {
     <p class="howto" style="margin:0 0 12px"><span><b>Talent Pool</b> = kho ứng viên tiềm năng. Người chưa hợp lúc này nhưng có điểm mạnh → giữ lại để gọi khi có vị trí khác.</span></p>
     <div class="field-label">Vì sao giữ lại ${esc(candName(c))}? (chọn 1 hoặc nhiều)</div>
     <div class="chips" style="margin-bottom:14px">${POOL_REASONS.map(r => `<button class="chip" data-act="toggleReason" data-val="${esc(r)}" type="button">${esc(r)}</button>`).join("")}</div>
-    <label class="field"><span>Ghi thêm (tuỳ chọn)</span><input id="poolNote" placeholder="VD: hợp vị trí kho ở Thủ Đức" autocomplete="off"></label>
+    <label class="field"><span>Ghi thêm (tuỳ chọn)</span><input id="poolNote" data-legal-check placeholder="VD: hợp vị trí kho ở Thủ Đức" autocomplete="off"></label>${legalSlot("poolNote", "")}
     <button class="btn primary block" data-act="confirmPool" type="button">⭐ Đưa vào Talent Pool</button>`);
 }
 
@@ -681,7 +678,7 @@ function openReject(id, presetType) {
     <div class="field-label">Lý do (nói nhẹ nhàng, chỉ chọn nếu muốn nêu)</div>
     <div class="chips" style="margin-bottom:12px">${REJECT_REASONS.map((r, i) => `<button class="chip ${i === 0 ? "on" : ""}" data-act="pickReject" data-group="reason" data-val="${esc(r)}" type="button">${esc(r)}</button>`).join("")}</div>
     <p class="small muted" style="margin-bottom:8px">⚠️ Không nêu lý do về tuổi, giới tính, hôn nhân, ngoại hình, quê quán — trái luật lao động.</p>
-    <textarea class="preview" id="rejectText">${esc(rejectText(c, defType, M.reason))}</textarea>
+    <textarea class="preview" id="rejectText" data-legal-check>${esc(rejectText(c, defType, M.reason))}</textarea>${legalSlot("rejectText", "")}
     <div class="btn-row" style="margin-top:12px" id="rejectBtns">${rejectButtons(c, defType)}</div>`);
 }
 function rejectButtons(c, type) {

@@ -169,7 +169,7 @@ const LEGAL_RULES = [
     fix: "Hỏi điều kiện công việc: “Bạn làm được ca tối, cuối tuần không?”" },
   { key: "thai sản", pattern: /(thai sản|mang thai|có bầu|sinh con|sinh em bé|nghỉ đẻ|kế hoạch sinh)/i,
     fix: "Không hỏi. Chỉ hỏi về ca làm và ngày bắt đầu." },
-  { key: "quê quán", pattern: /(quê quán|quê ở|người miền|dân miền|hộ khẩu|gốc (bắc|trung|nam)|người (bắc|trung|nam)(?![\p{L}])|dân tộc|xuất thân)/iu,
+  { key: "quê quán", pattern: /((?<![\p{L}])quê(?![\p{L}])|người miền|dân miền|hộ khẩu|gốc (bắc|trung|nam)|người (bắc|trung|nam)(?![\p{L}])|dân tộc|xuất thân)/iu,
     fix: "Hỏi: “Bạn đi lại tới cửa hàng mất bao lâu?” thay vì hỏi quê." },
   { key: "tôn giáo", pattern: /(tôn giáo|theo đạo|đạo phật|công giáo|thiên chúa|ăn chay)/i,
     fix: "Không dùng. Nếu cần làm lễ/Tết → hỏi “Bạn làm được ca ngày lễ không?”" },

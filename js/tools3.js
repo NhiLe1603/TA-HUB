@@ -153,7 +153,7 @@ function viewJD(query) {
     <ul class="tight small" style="margin-top:10px">${POST_TIPS.map(t => `<li>${t}</li>`).join("")}</ul></div>`;
   html += `<div class="card"><div class="card-head"><h2>👀 3 bản tin đăng</h2></div><div id="jdPreview">${jdPreviewHtml(p, cd)}</div>
     <div class="divider"></div>
-    <div class="btn-row"><button class="btn primary" data-act="jdSave" type="button">💾 Lưu tin đăng vào vị trí</button></div>
+    <div class="btn-row"><button class="btn primary" data-act="jdSave" type="button">💾 Lưu tin đăng vào vị trí</button>${backupBtn()}</div>
     ${saved && saved.capNhat ? `<p class="small muted" style="margin-top:8px">Lần lưu trước: ${esc(fmtDate(saved.capNhat, true))}${saved.by ? " · " + esc(saved.by) : ""}</p>` : ""}</div>`;
   return html;
 }
@@ -244,7 +244,7 @@ function viewSourcing(query) {
       ${str(d.research.mucTieuCVTuan) ? `<p class="small muted">AI gợi ý mục tiêu: <b>${esc(d.research.mucTieuCVTuan)} CV/tuần</b>.</p>` : ""}`
     : `<p class="muted small">Chưa chọn kênh nào.</p>`}
     <label class="field" style="margin-top:12px"><span>Ghi chú kế hoạch</span>${bound("sg", "ghiChu", { area: true, ph: "VD: Tuần 1 đăng 3 group FB, nhờ cửa hàng trưởng giới thiệu; tuần 2 xem lại kênh nào ra người." })}</label>
-    <button class="btn primary" data-act="sgSave" type="button">💾 Lưu kế hoạch nguồn</button></div>`;
+    <div class="btn-row"><button class="btn primary" data-act="sgSave" type="button">💾 Lưu kế hoạch nguồn</button>${backupBtn()}</div></div>`;
 
   // 4. Hiệu quả kênh
   const stats = channelStats(p.posId);
