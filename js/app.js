@@ -151,7 +151,7 @@ function renderNav(route, id) {
   $("#sideNav").innerHTML = html;
   $("#bottomNav").innerHTML = html;
   const cur = NAV.find(n => n.id === active);
-  const sub = { candidate: "Hồ sơ ứng viên", position: "Chân dung & phiếu điểm" }[route]
+  const sub = { candidate: "Hồ sơ ứng viên", position: "Chân dung & phiếu điểm", activity: "Nhật ký hoạt động" }[route]
     || (route === "tools" ? ({ "loc-cv": "Lọc CV", "so-van": "Sơ vấn", jd: "Viết JD & tin đăng", nguon: "Tạo nguồn", "so-sanh": "So sánh ứng viên" }[id] || "") : "");
   $("#topTitle").textContent = sub || (cur ? cur.label : "");
 }
@@ -207,7 +207,7 @@ function render() {
   renderUserChip();
   renderBanner();
   const view = $("#view");
-  const views = { home: viewHome, learn: viewLearn, positions: viewPositions, position: viewPosition, tools: viewTools, candidates: viewCandidates, candidate: viewCandidate };
+  const views = { home: viewHome, learn: viewLearn, positions: viewPositions, position: viewPosition, tools: viewTools, candidates: viewCandidates, candidate: viewCandidate, activity: viewActivity };
   view.innerHTML = (views[route] || viewHome)(id, query);
 
   if (sameView) {
@@ -288,6 +288,7 @@ function viewHome() {
       <div class="list">${g.list.map(c => candRow(c, { showTA: false })).join("")}</div>`).join("");
   }
   html += `</div>`;
+  html += recentActivityCard();
   return html;
 }
 
@@ -437,7 +438,7 @@ function viewCandidate(id) {
     ? `<ul class="timeline">${history.slice().reverse().map(h => `<li><b>${esc(h.den)}</b>${h.tu ? ` <span class="muted">(từ ${esc(h.tu)})</span>` : ""}
         <div class="small muted">${esc(fmtDate(h.t, true))}${h.by ? " · " + esc(h.by) : ""}</div>${h.note ? `<div class="small">“${esc(h.note)}”</div>` : ""}</li>`).join("")}</ul>`
     : `<p class="muted small">Chưa có lịch sử. Mỗi lần đổi trạng thái, app sẽ ghi lại ở đây.</p>`;
-  html += `</div>`;
+  html += candidateLogsHtml(c.candId) + `</div>`;
 
   html += `<div style="text-align:center;margin:8px 0 4px"><button class="btn ghost" style="color:var(--bad)" data-act="deleteCandidate" data-id="${esc(c.candId)}" type="button">🗑 Xoá ứng viên này</button></div>`;
   return html;
@@ -500,7 +501,8 @@ function openSettings() {
     <div class="divider"></div>
     <h3 style="margin-bottom:6px">Người dùng</h3>
     <p class="small muted" style="margin-bottom:10px">Đang dùng tên: <b>${esc(getUser())}</b></p>
-    <button class="btn" data-act="openLogin" type="button">Đổi tên</button>`);
+    <div class="btn-row"><button class="btn" data-act="openLogin" type="button">Đổi tên</button>
+      <button class="btn" data-act="goActivity" type="button">📜 Nhật ký hoạt động</button></div>`);
 }
 
 /* --- Thêm / sửa ứng viên --- */

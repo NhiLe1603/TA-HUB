@@ -13,6 +13,7 @@ atino-ta-hub/
 ├── js/tools3.js    ← Pha 3: Viết JD & tin đăng (AIDA), Tạo nguồn, So sánh ứng viên
 ├── js/learn-content.js ← nội dung mục Học: 6 bài + 18 câu đố (sửa chữ ở đây)
 ├── js/learn.js     ← Pha 4: màn Học, hướng dẫn luồng ở Trang chủ, chặn pháp lý chung
+├── js/activity.js  ← Nhật ký hoạt động (ai làm gì, lúc nào) — lưu ở tab "Logs" trên Sheet
 ├── Code.gs         ← backend Apps Script (dán vào Google Sheet)
 └── .nojekyll       ← để GitHub Pages phục vụ file nguyên trạng
 ```

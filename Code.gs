@@ -14,7 +14,9 @@
  * HỢP ĐỒNG API (cho app gọi):
  *  ĐỌC  (GET,  ?action=...):
  *    - ping                         → {ok,time}
- *    - all                          → {ok, positions:[...], candidates:[...]}   (dùng khi mở app)
+ *    - all                          → {ok, positions:[...], candidates:[...], logs:[...]}   (dùng khi mở app)
+ *    - listLogs[&limit&ta]          → {ok, data:[...]}  nhật ký hoạt động, mới nhất trước
+ *  Mọi lệnh GHI có thể kèm  log:{logId,ta,hanhDong,loai,doiTuongId,ten,chiTiet}  → tự thêm vào tab "Logs"
  *    - listPositions                → {ok, data:[...]}
  *    - listCandidates[&posId&trangThai&ta] → {ok, data:[...]}  (lọc tuỳ chọn)
  *    - getPosition&posId=...        → {ok, data:{...}}
@@ -42,6 +44,11 @@ var CAND_H = ['candId','hoTen','maHoSo','posId','nguon','taPhuTrach','trangThai'
               'diemCV','ketLuanCV','diemSoVan','ketLuanSoVan','ghiChu','chiTiet','ngayTao','ngayCapNhat'];
 var CAND_J = ['chiTiet'];
 
+/* Nhật ký hoạt động (thêm ở bản cập nhật "Nhật ký"): mỗi lệnh ghi có thể kèm {log:{...}} */
+var LOG   = 'Logs';
+var LOG_H = ['logId','thoiGian','ta','hanhDong','loai','doiTuongId','ten','chiTiet'];
+var LOG_LIMIT = 500;   // số dòng nhật ký mới nhất trả về cho app
+
 /* ----------------------- ĐỌC (GET) ----------------------- */
 function doGet(e){
   try{
@@ -50,7 +57,9 @@ function doGet(e){
     if(action==='ping')          return json_({ok:true, time:new Date()});
     if(action==='all')           return json_({ok:true,
                                       positions: readAll_(POS,  POS_H,  POS_J),
-                                      candidates: readAll_(CAND, CAND_H, CAND_J)});
+                                      candidates: readAll_(CAND, CAND_H, CAND_J),
+                                      logs: readLogs_(LOG_LIMIT, '')});
+    if(action==='listLogs')      return json_({ok:true, data: readLogs_(Number(p.limit)||LOG_LIMIT, p.ta||'')});
     if(action==='listPositions') return json_({ok:true, data: readAll_(POS, POS_H, POS_J)});
     if(action==='listCandidates'){
       var list = readAll_(CAND, CAND_H, CAND_J);
@@ -73,18 +82,21 @@ function doPost(e){
     var body = {};
     if(e && e.postData && e.postData.contents) body = JSON.parse(e.postData.contents);
     var action = body.action;
+    var result = null;
     if(action==='savePosition')
-      return json_({ok:true, data: upsert_(POS, POS_H, POS_J, 'posId', body.position || {}, 'P')});
-    if(action==='saveCandidate')
-      return json_({ok:true, data: upsert_(CAND, CAND_H, CAND_J, 'candId', body.candidate || {}, 'C')});
-    if(action==='updateStage')
-      return json_({ok:true, data: upsert_(CAND, CAND_H, CAND_J, 'candId',
-                      {candId:body.candId, trangThai:body.trangThai}, 'C')});
-    if(action==='deleteCandidate')
-      return json_({ok: deleteById_(CAND, CAND_H, 'candId', body.candId)});
-    if(action==='deletePosition')
-      return json_({ok: deleteById_(POS, POS_H, 'posId', body.posId)});
-    return json_({ok:false, error:'Unknown POST action: '+action});
+      result = {ok:true, data: upsert_(POS, POS_H, POS_J, 'posId', body.position || {}, 'P')};
+    else if(action==='saveCandidate')
+      result = {ok:true, data: upsert_(CAND, CAND_H, CAND_J, 'candId', body.candidate || {}, 'C')};
+    else if(action==='updateStage')
+      result = {ok:true, data: upsert_(CAND, CAND_H, CAND_J, 'candId',
+                      {candId:body.candId, trangThai:body.trangThai}, 'C')};
+    else if(action==='deleteCandidate')
+      result = {ok: deleteById_(CAND, CAND_H, 'candId', body.candId)};
+    else if(action==='deletePosition')
+      result = {ok: deleteById_(POS, POS_H, 'posId', body.posId)};
+    else return json_({ok:false, error:'Unknown POST action: '+action});
+    if(body.log) appendLog_(body.log);   // ghi nhật ký cùng lúc với thao tác
+    return json_(result);
   }catch(err){
     return json_({ok:false, error:String(err)});
   }finally{
@@ -187,8 +199,37 @@ function deleteById_(name, headers, idKey, idVal){
   return false;
 }
 
-/* Chạy 1 lần (tuỳ chọn) để tạo sẵn 2 tab + header */
+/* ----------------------- NHẬT KÝ ------------------------- */
+/* Thêm 1 dòng nhật ký. Bỏ qua nếu logId đã có (app gửi lại khi mạng chập chờn). */
+function appendLog_(log){
+  var sh = getSheet_(LOG, LOG_H);
+  var last = sh.getLastRow();
+  if(log.logId && last >= 2){
+    var n = Math.min(50, last-1);
+    var ids = sh.getRange(last-n+1, 1, n, 1).getValues();
+    for(var i=0;i<ids.length;i++){ if(String(ids[i][0])===String(log.logId)) return; }
+  }
+  sh.appendRow(LOG_H.map(function(h){
+    if(h==='thoiGian') return new Date();          // giờ máy chủ, tránh lệch giờ máy TA
+    var v = log[h];
+    return (v===undefined || v===null) ? '' : String(v).slice(0, 1000);
+  }));
+}
+/* Đọc nhật ký mới nhất trước */
+function readLogs_(limit, ta){
+  var sh = getSheet_(LOG, LOG_H);
+  var last = sh.getLastRow();
+  if(last < 2) return [];
+  var n = Math.min(limit, last-1);
+  var rows = sh.getRange(last-n+1, 1, n, LOG_H.length).getValues();
+  var out = rows.map(function(r){ var o={}; LOG_H.forEach(function(h,i){ o[h]=r[i]; }); return o; }).reverse();
+  if(ta) out = out.filter(function(o){ return String(o.ta)===String(ta); });
+  return out;
+}
+
+/* Chạy 1 lần (tuỳ chọn) để tạo sẵn các tab + header */
 function setup(){
   getSheet_(POS,  POS_H);
   getSheet_(CAND, CAND_H);
+  getSheet_(LOG,  LOG_H);
 }

@@ -641,6 +641,25 @@ a.tool-card:hover { border-color: var(--primary); }
 .flow li.done .flow-txt b { color: var(--muted); font-weight: 500; text-decoration: line-through; }
 .flow-txt { display: flex; flex-direction: column; min-width: 0; }
 
+/* ================= NHẬT KÝ ================= */
+.ta-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+@media (min-width: 700px) { .ta-stats { grid-template-columns: repeat(4, 1fr); } }
+.ta-stat {
+  display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); text-align: left;
+}
+.ta-stat.on { border-color: var(--primary); background: var(--primary-soft); }
+.ta-stat > span:last-child { display: flex; flex-direction: column; line-height: 1.2; }
+.ta-stat b { font-size: 20px; }
+.log-day { font-weight: 700; font-size: 13px; color: var(--muted); padding: 12px 0 4px; border-bottom: 1px solid var(--line); }
+.log-day:first-of-type { padding-top: 0; }
+.log-row { display: grid; grid-template-columns: 44px 24px 1fr; gap: 6px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; align-items: start; }
+.log-row:last-child { border-bottom: 0; }
+.log-time { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.log-ico { text-align: center; }
+.log-main { min-width: 0; word-break: break-word; }
+.log-main .small { display: block; }
+
 /* Placeholder */
 .soon { text-align: center; padding: 30px 16px; }
 .soon .ico { font-size: 42px; }

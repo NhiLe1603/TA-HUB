@@ -124,6 +124,8 @@ const Store = (() => {
   const state = {
     positions: cached ? cached.positions || [] : [],
     candidates: cached ? cached.candidates || [] : [],
+    logs: cached ? cached.logs || [] : [],
+    logsSupported: cached ? cached.logsSupported : undefined, // false = backend cũ chưa có tab Logs
     lastSync: cached ? cached.lastSync || null : null,
     hasData: !!cached,
     outbox: LocalDB.get(LS_KEYS.outbox, []),
@@ -140,7 +142,7 @@ const Store = (() => {
     statusListeners.forEach(f => { try { f(status, msg); } catch (e) { console.error(e); } });
   }
   function persist() {
-    LocalDB.set(LS_KEYS.cache, { positions: state.positions, candidates: state.candidates, lastSync: state.lastSync });
+    LocalDB.set(LS_KEYS.cache, { positions: state.positions, candidates: state.candidates, logs: state.logs.slice(0, 500), logsSupported: state.logsSupported, lastSync: state.lastSync });
     LocalDB.set(LS_KEYS.outbox, state.outbox);
   }
 
@@ -159,6 +161,7 @@ const Store = (() => {
       case "deleteCandidate": state.candidates = state.candidates.filter(c => String(c.candId) !== String(body.candId)); break;
       case "deletePosition": state.positions = state.positions.filter(p => String(p.posId) !== String(body.posId)); break;
     }
+    if (body.log && !state.logs.some(l => l.logId === body.log.logId)) state.logs.unshift(Object.assign({ thoiGian: now }, body.log));
   }
 
   /** Tải toàn bộ dữ liệu từ Sheet */
@@ -169,6 +172,8 @@ const Store = (() => {
       const json = await apiGet("all");
       state.positions = json.positions || [];
       state.candidates = json.candidates || [];
+      state.logsSupported = Array.isArray(json.logs);
+      if (state.logsSupported) state.logs = json.logs;
       state.outbox.forEach(item => applyLocal(item.body)); // giữ các thay đổi chưa gửi
       state.lastSync = new Date().toISOString();
       state.hasData = true;
@@ -216,6 +221,10 @@ const Store = (() => {
 
   /** Lưu 1 thay đổi: hiện ngay + gửi lên Sheet */
   function save(body) {
+    // Tự ghi nhật ký: mô tả thao tác dựa trên dữ liệu TRƯỚC khi thay đổi
+    if (!body.log && typeof api.describe === "function") {
+      try { body.log = api.describe(body) || undefined; } catch (e) { console.warn(e); }
+    }
     applyLocal(body);
     state.hasData = true;
     if (isConnected()) state.outbox.push({ id: genId("Q"), body, ts: Date.now() });
@@ -234,12 +243,15 @@ const Store = (() => {
     };
   }
 
-  return {
+  const api = {
     state,
     get positions() { return state.positions; },
     get candidates() { return state.candidates; },
+    get logs() { return state.logs; },
+    describe: null, // gán ở js/activity.js
     onChange(f) { changeListeners.push(f); },
     onStatus(f) { statusListeners.push(f); },
     setStatus, refresh, flush, save, exportJSON
   };
+  return api;
 })();
