@@ -23,7 +23,9 @@ const clearDraft = key => LocalDB.remove(DRAFT_PREFIX + key);
 const draftTimers = {};
 function persistDraft(scope) {
   clearTimeout(draftTimers[scope]);
-  draftTimers[scope] = setTimeout(() => { if (D[scope]) LocalDB.set(DRAFT_PREFIX + D[scope + "Key"], D[scope]); }, 300);
+  const obj = D[scope], key = D[scope + "Key"];
+  // Chỉ ghi nếu vẫn đang sửa đúng bản nháp đó (tránh ghi lại nháp ngay sau khi vừa lưu lên Sheet)
+  draftTimers[scope] = setTimeout(() => { if (obj && D[scope] === obj && D[scope + "Key"] === key) LocalDB.set(DRAFT_PREFIX + key, obj); }, 300);
 }
 const clone = o => JSON.parse(JSON.stringify(o));
 const uid = p => p + Date.now().toString(36) + Math.floor(Math.random() * 100);
@@ -294,6 +296,14 @@ function viewPosition(id) {
       <button class="btn" data-act="pdCopyHM" type="button">📋 Copy gửi HM xác nhận</button>
       <button class="btn primary" data-act="pdSave" type="button">💾 Lưu vị trí</button></div>
     ${!isNew ? `<div style="text-align:center;margin-top:12px"><button class="btn ghost" style="color:var(--bad)" data-act="pdDelete" type="button">🗑 Xoá vị trí này</button></div>` : ""}</div>`;
+  if (!isNew) {
+    const q = "?pos=" + encodeURIComponent(d.posId);
+    html += `<div class="card"><div class="card-head"><h2>➡️ Bước tiếp theo cho vị trí này</h2></div><div class="tool-grid" style="margin:0">
+      <a class="tool-card" href="#/tools/jd${q}"><span class="ico">✍️</span><span><b>Viết tin đăng</b><span class="d">AIDA, 3 bản</span></span><span class="go">→</span></a>
+      <a class="tool-card" href="#/tools/nguon${q}"><span class="ico">📣</span><span><b>Tạo nguồn</b><span class="d">Kênh + kế hoạch</span></span><span class="go">→</span></a>
+      <a class="tool-card" href="#/tools/so-sanh${q}"><span class="ico">⚖️</span><span><b>So sánh ứng viên</b><span class="d">Xếp hạng theo điểm</span></span><span class="go">→</span></a>
+      <a class="tool-card" href="#/candidates?posId=${encodeURIComponent(d.posId)}"><span class="ico">👥</span><span><b>Ứng viên của vị trí</b><span class="d">Danh sách & trạng thái</span></span><span class="go">→</span></a></div></div>`;
+  }
   return html;
 }
 
@@ -303,6 +313,9 @@ function viewPosition(id) {
 function viewTools(id, query) {
   if (id === "loc-cv") return viewLocCV(query);
   if (id === "so-van") return viewSoVan(query);
+  if (id === "jd") return viewJD(query);
+  if (id === "nguon") return viewSourcing(query);
+  if (id === "so-sanh") return viewCompare(query);
   const user = getUser();
   const mine = Store.candidates.filter(c => str(c.taPhuTrach) === user);
   const needCV = sortRecent(mine.filter(c => stageOf(c) === "Mới")).slice(0, 5);
@@ -314,9 +327,9 @@ function viewTools(id, query) {
   html += `<div class="tool-grid">
     ${tool("#/tools/loc-cv", "📄", "Lọc CV", "Chấm hồ sơ theo phiếu điểm, có AI đối chiếu")}
     ${tool("#/tools/so-van", "📞", "Sơ vấn", "Phiếu gọi sơ bộ 6 phần, có câu hỏi gợi ý")}
-    ${tool("", "✍️", "Viết JD & tin đăng", "AIDA, 3 bản cho 3 kênh", true)}
-    ${tool("", "📣", "Tạo nguồn", "Kênh + kế hoạch tìm ứng viên", true)}
-    ${tool("", "⚖️", "So sánh ứng viên", "Ma trận điểm, xếp hạng", true)}
+    ${tool("#/tools/jd", "✍️", "Viết JD & tin đăng", "AIDA, ra 3 bản cho 3 kênh")}
+    ${tool("#/tools/nguon", "📣", "Tạo nguồn", "Nghiên cứu thị trường + kế hoạch kênh")}
+    ${tool("#/tools/so-sanh", "⚖️", "So sánh ứng viên", "Bảng điểm, xếp hạng, gợi ý chọn")}
   </div>`;
   const quick = (title, list, toolId, empty) => `<div class="card"><div class="card-head"><h2>${title}</h2></div>${list.length
     ? `<div class="list">${list.map(c => `<a class="row" href="#/tools/${toolId}?cand=${encodeURIComponent(c.candId)}"><span class="avatar">${esc(initials(candName(c)))}</span>

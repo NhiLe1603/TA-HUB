@@ -152,7 +152,7 @@ function renderNav(route, id) {
   $("#bottomNav").innerHTML = html;
   const cur = NAV.find(n => n.id === active);
   const sub = { candidate: "Hồ sơ ứng viên", position: "Chân dung & phiếu điểm" }[route]
-    || (route === "tools" && id === "loc-cv" ? "Lọc CV" : route === "tools" && id === "so-van" ? "Sơ vấn" : "");
+    || (route === "tools" ? ({ "loc-cv": "Lọc CV", "so-van": "Sơ vấn", jd: "Viết JD & tin đăng", nguon: "Tạo nguồn", "so-sanh": "So sánh ứng viên" }[id] || "") : "");
   $("#topTitle").textContent = sub || (cur ? cur.label : "");
 }
 

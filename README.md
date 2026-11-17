@@ -10,6 +10,7 @@ atino-ta-hub/
 ├── js/content.js   ← nội dung chuyên môn: mẫu chân dung, pháp lý, câu hỏi, prompt AI (sửa chữ ở đây)
 ├── js/app.js       ← khung app, Trang chủ, Ứng viên
 ├── js/tools.js     ← Pha 2: Vị trí (chân dung + phiếu điểm), Lọc CV, Sơ vấn
+├── js/tools3.js    ← Pha 3: Viết JD & tin đăng (AIDA), Tạo nguồn, So sánh ứng viên
 ├── Code.gs         ← backend Apps Script (dán vào Google Sheet)
 └── .nojekyll       ← để GitHub Pages phục vụ file nguyên trạng
 ```

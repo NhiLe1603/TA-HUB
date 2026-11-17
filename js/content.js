@@ -330,3 +330,142 @@ function parseAIJson(text) {
   try { return JSON.parse(t.replace(/,\s*([}\]])/g, "$1")); }
   catch (e) { throw new Error("JSON bị lỗi định dạng. Bảo AI: “Chỉ trả về JSON đúng mẫu, không thêm chữ nào” rồi dán lại."); }
 }
+
+/* =============================================================
+ * PHA 3 — THƯƠNG HIỆU · JD/TIN ĐĂNG · TẠO NGUỒN
+ * ============================================================= */
+const BRAND = {
+  ten: "ATINO",
+  slogan: "Always Be Casual",
+  evp: "We Are A Team – Come Join Us",
+  gioiThieu: "ATINO là chuỗi thời trang nam với khoảng 13 năm phát triển, có cửa hàng trên toàn quốc. Tinh thần “Always Be Casual”: thoải mái, tự tin, đúng chất.",
+  usp: [
+    "Thử việc chỉ 1 tháng",
+    "Phụ cấp nhiều lớp: ăn ca, chuyên cần, thâm niên",
+    "Phỏng vấn gọn 1 vòng",
+    "Thương hiệu uy tín ~13 năm, chuỗi toàn quốc"
+  ]
+};
+
+/* Câu mở đầu (hook) gợi ý — chọn 1 rồi sửa */
+const HOOK_IDEAS = [
+  "Thử việc chỉ 1 tháng — đi làm là có đủ phụ cấp, không chờ lâu.",
+  "Phỏng vấn gọn 1 vòng, có kết quả trong 2 ngày.",
+  "Thu nhập [X–Y] triệu/tháng + phụ cấp ăn ca, chuyên cần, thâm niên.",
+  "Bạn mê thời trang nam và thích nói chuyện với khách? Chỗ này dành cho bạn.",
+  "Làm ở chuỗi thời trang nam 13 năm — Always Be Casual."
+];
+const WHY_IDEAS = [
+  ...BRAND.usp,
+  "Đội nhóm thân thiện — We Are A Team",
+  "Được đào tạo sản phẩm & kỹ năng bán hàng từ đầu",
+  "Lộ trình lên trưởng ca / cửa hàng trưởng rõ ràng",
+  "Văn hoá: phục vụ khách bằng cả trái tim, thương đồng đội"
+];
+const CTA_IDEAS = [
+  "Nhắn Zalo [SĐT] — ghi “Ứng tuyển + tên cửa hàng” để được hẹn phỏng vấn.",
+  "Bình luận “Quan tâm”, mình gửi link ứng tuyển ngay.",
+  "Bấm vào link ở bình luận đầu tiên để ứng tuyển (chỉ 2 phút).",
+  "Nộp hồ sơ ngay trên trang này — ATINO phản hồi trong 2 ngày."
+];
+/* Việc chính & quyền lợi mặc định theo nhóm (chỉ là gợi ý để sửa) */
+const JD_DEFAULTS = {
+  Mass: {
+    viec: ["Đón khách, tư vấn và giúp khách chọn đồ phù hợp", "Thu ngân, gói hàng, hướng dẫn đổi trả", "Sắp xếp, trưng bày hàng hoá gọn đẹp", "Kiểm kho, nhận hàng theo ca"],
+    quyenLoi: ["Tổng thu nhập [X–Y] triệu/tháng (lương + thưởng doanh số)", "Phụ cấp ăn ca, chuyên cần, thâm niên", "Thử việc 1 tháng, được đào tạo từ đầu", "Đóng BHXH đầy đủ khi chính thức, giảm giá khi mua hàng"]
+  },
+  BackOffice: {
+    viec: ["[Việc chuyên môn chính 1]", "[Việc chuyên môn chính 2]", "Phối hợp với cửa hàng và các phòng ban", "Báo cáo định kỳ cho quản lý"],
+    quyenLoi: ["Lương [X–Y] triệu/tháng + thưởng", "Làm giờ hành chính, môi trường thân thiện", "BHXH đầy đủ, nghỉ phép năm", "Được đào tạo, có lộ trình phát triển"]
+  },
+  QuanLy: {
+    viec: ["Quản lý doanh số và vận hành cửa hàng", "Tuyển, đào tạo và xếp ca cho đội ngũ", "Đảm bảo trải nghiệm khách hàng theo chuẩn ATINO", "Báo cáo kết quả kinh doanh cho quản lý khu vực"],
+    quyenLoi: ["Tổng thu nhập [X–Y] triệu/tháng + thưởng doanh số cửa hàng", "Phụ cấp trách nhiệm, thâm niên", "Lộ trình lên quản lý khu vực", "BHXH đầy đủ, chế độ phúc lợi"]
+  }
+};
+const POST_TIPS = [
+  "Ưu tiên <b>ảnh thật</b> của cửa hàng / đồng nghiệp ATINO. Tránh ảnh AI vẽ người — ứng viên mất tin tưởng.",
+  "Đăng FB: để <b>link ở bình luận đầu tiên</b>, đừng để trong bài (FB giảm hiển thị bài có link).",
+  "Chỉ <b>1 lời kêu gọi (CTA)</b> — nhiều lựa chọn quá ứng viên không làm gì cả."
+];
+
+/** Kiểm tra quy tắc đăng tin. Trả về [{ok, t}] */
+function postRules(d, versions) {
+  const all = [d.hook, d.thuNhap, ...(d.ly || []), ...(d.viec || []), ...(d.quyenLoi || []), d.cta].join("\n");
+  const lines = Object.values(versions).join("\n").split("\n");
+  const caps = lines.filter(l => { const letters = l.replace(/[^\p{L}]/gu, ""); return letters.length >= 6 && letters === letters.toUpperCase() && letters !== letters.toLowerCase(); });
+  const ctaWords = /(inbox|nhắn tin|nhắn zalo|(?<![\p{L}])ib(?![\p{L}])|liên hệ|đăng ký|nộp cv|nộp hồ sơ|apply|bình luận|comment|gọi ngay)/iu;
+  const extraCTA = [d.hook, ...(d.ly || []), ...(d.viec || []), ...(d.quyenLoi || [])].filter(x => ctaWords.test(String(x || ""))).length;
+  const fbText = [d.hook, d.cta, ...(d.ly || []), ...(d.viec || []), ...(d.quyenLoi || [])].join(" ");
+  const banned = all.match(/(khoá học|khóa học|đa cấp|kinh doanh theo mạng|việc nhẹ lương cao|thu nhập khủng|làm giàu)/i);
+  const tn = String(d.thuNhap || "").trim();
+  return [
+    { ok: !caps.length, t: caps.length ? `Có dòng VIẾT HOA TOÀN BỘ: “${caps[0].trim().slice(0, 40)}…” — viết thường cho dễ đọc, FB không bóp tương tác.` : "Không viết HOA toàn bộ" },
+    { ok: !!str(d.cta) && !extraCTA, t: !str(d.cta) ? "Chưa có lời kêu gọi (CTA) — điền ở phần A cuối." : extraCTA ? "Đang có lời kêu gọi lẫn trong các phần khác — chỉ giữ <b>1 CTA</b> ở cuối." : "Chỉ 1 lời kêu gọi (CTA)" },
+    { ok: !/(https?:\/\/|www\.|\.com|\.vn)/i.test(fbText), t: /(https?:\/\/|www\.|\.com|\.vn)/i.test(fbText) ? "Có link trong bài FB — để link ở <b>bình luận</b> nhé." : "Không để link trong bài FB (link ở bình luận)" },
+    { ok: !banned, t: banned ? `Có từ dễ bị chặn/mất tin tưởng: “${banned[0]}” — bỏ đi.` : "Không có từ “khoá học / đa cấp / việc nhẹ lương cao”" },
+    { ok: !!tn && !/(thoả thuận|thỏa thuận|cạnh tranh|hấp dẫn)$/i.test(tn) && /\d/.test(tn), t: !tn ? "Chưa ghi <b>tổng thu nhập</b>." : /\d/.test(tn) ? "Có ghi tổng thu nhập bằng con số" : "Ghi <b>con số</b> tổng thu nhập, đừng ghi “thoả thuận/cạnh tranh”." },
+    { ok: !legalCheck(all).length, t: legalCheck(all).length ? `Có tiêu chí cấm (${legalCheck(all).map(h => h.key).join(", ")}) — xoá khỏi tin đăng.` : "Không có tiêu chí cấm (tuổi, giới, ngoại hình…)" }
+  ];
+}
+
+/* Kênh tuyển & gợi ý theo nhóm */
+const CHANNEL_SUGGEST = {
+  Mass: ["Group Facebook", "Threads", "Zalo", "Giới thiệu (referral)", "Ứng viên cũ", "Fanpage ATINO"],
+  BackOffice: ["TopCV", "VietnamWorks", "Group Facebook", "LinkedIn", "Network/quen biết"],
+  QuanLy: ["TopCV", "VietnamWorks", "LinkedIn", "Headhunt", "Giới thiệu (referral)"]
+};
+const IN_HOUSE = [
+  { t: "Giới thiệu (referral)", d: "Nhờ nhân viên giới thiệu bạn bè. Thưởng <b>chia giai đoạn</b> (vd 30% khi đi làm, 70% khi qua thử việc) để giới thiệu đúng người. Làm <b>bảng xếp hạng</b> người giới thiệu nhiều nhất cho vui." },
+  { t: "Ứng viên cũ (Talent Pool)", d: "Gọi lại người từng có điểm mạnh nhưng chưa hợp lúc trước — nhanh và rẻ nhất." },
+  { t: "Luân chuyển nội bộ", d: "Hỏi cửa hàng gần đó có bạn nào muốn chuyển ca/chuyển chỗ không." }
+];
+const INCOGNITO_STEPS = [
+  "Mở <b>trình duyệt ẩn danh</b> (Chrome: Ctrl+Shift+N) để Google không gợi ý theo lịch sử của bạn.",
+  "Gõ đúng chữ ứng viên hay tìm, vd “tuyển nhân viên bán hàng quận 1”.",
+  "Xem <b>5 kết quả đầu</b>: trang nào/nhóm nào hiện lên → đó là kênh ứng viên đang thấy.",
+  "Làm tương tự trên Facebook, TikTok: xem nhóm nào đông, đăng nhiều tin tuyển."
+];
+
+function aiPromptJD({ pos, cd, d }) {
+  return `Bạn là chuyên gia Marketing tuyển dụng ngành bán lẻ thời trang tại Việt Nam, viết tin tuyển cho ATINO.
+Thương hiệu: ${BRAND.gioiThieu} Slogan "${BRAND.slogan}". EVP: "${BRAND.evp}".
+5 giá trị cốt lõi: ${CORE_VALUES.join("; ")}.
+USP (lợi thế khi tuyển): ${BRAND.usp.join("; ")}.
+
+Vị trí: ${pos.tenViTri} · Khu vực: ${str(d.diaDiem) || str(cd.khuVuc) || "[chưa ghi]"} · Tổng thu nhập: ${str(d.thuNhap) || "[chưa ghi]"}
+Kết quả mong muốn: ${JSON.stringify(cd.mucTieu || {})}
+Điều kiện bắt buộc: ${(cd.mustHave || []).map(m => m.ten).join("; ") || "[không có]"}
+
+Viết theo khung AIDA:
+- hook (A): 1 câu chặn tay người đang lướt, dùng USP mạnh nhất, tối đa 20 chữ.
+- ly (I): 3 lý do "vì sao chọn ATINO thay vì chỗ khác", mỗi lý do 1 dòng ngắn.
+- viec (D): 3–4 việc chính, động từ đầu câu, dễ hiểu.
+- quyenLoi (D): 3–4 quyền lợi, có con số nếu được.
+- cta (A): ĐÚNG 1 lời kêu gọi hành động.
+QUY TẮC: không viết HOA toàn bộ; không để link; không dùng từ "khoá học", "đa cấp", "việc nhẹ lương cao"; ghi tổng thu nhập bằng con số (không "thoả thuận"); TUYỆT ĐỐI không nêu tuổi, giới tính, hôn nhân, quê quán, tôn giáo, ngoại hình. Tiếng Việt, giọng gần gũi.
+
+CHỈ TRẢ VỀ JSON đúng mẫu, không giải thích, không markdown:
+{"hook": "", "ly": ["", "", ""], "viec": ["", "", ""], "quyenLoi": ["", "", ""], "thuNhap": "", "cta": ""}`;
+}
+
+function aiPromptMarket({ pos, khuVuc, jdText }) {
+  return `Bạn là chuyên viên nghiên cứu thị trường tuyển dụng ngành bán lẻ thời trang tại Việt Nam.
+Hãy nghiên cứu nhanh (có thể tìm trên web nếu được) cho vị trí sau của ATINO (chuỗi thời trang nam ~13 năm, toàn quốc):
+- Chức danh: ${pos.tenViTri}
+- Khu vực: ${khuVuc || "[ghi khu vực]"}
+- Nhóm: ${pos.nhom} (Mass = cửa hàng tuyển số lượng; BackOffice = văn phòng; QuanLy = quản lý)
+- Tin tuyển hiện tại: ${jdText ? "\n" + jdText.slice(0, 1500) : "[chưa có]"}
+
+Cần trả lời:
+1. Thị trường thường gọi tên vị trí này là gì (từ khoá ứng viên hay tìm).
+2. Mức lương/thu nhập phổ biến tại khu vực (benchmark), ghi khoảng số.
+3. 3–5 đối thủ tuyển cùng vị trí trong khu vực (thời trang/bán lẻ) và họ đang mời gọi gì.
+4. USP của ATINO nên đưa lên đầu tin để thắng đối thủ.
+5. 3–5 kênh nên đăng (kèm lý do ngắn). Ưu tiên kênh miễn phí/nội bộ nếu phù hợp.
+6. Độ khó tuyển ở khu vực (Dễ / Trung bình / Khó) và mục tiêu số CV/tuần hợp lý.
+Không đưa ra tiêu chí về tuổi, giới tính, ngoại hình, quê quán.
+
+CHỈ TRẢ VỀ JSON đúng mẫu, không giải thích, không markdown:
+{"tuKhoa": ["", ""], "luongBenchmark": "", "doiThu": [{"ten": "", "moiGoi": ""}], "uspNenDua": ["", ""], "kenhDeXuat": [{"kenh": "", "lyDo": ""}], "doKho": "Trung bình", "mucTieuCVTuan": 20}`;
+}
