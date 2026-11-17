@@ -7,7 +7,9 @@ atino-ta-hub/
 ├── index.html      ← trang chính
 ├── css/style.css   ← giao diện (kiểu Lark, có dark mode)
 ├── js/api.js       ← lớp dữ liệu: API_URL, đọc/ghi Sheet, cache, hàng chờ lưu
-├── js/app.js       ← màn hình & thao tác
+├── js/content.js   ← nội dung chuyên môn: mẫu chân dung, pháp lý, câu hỏi, prompt AI (sửa chữ ở đây)
+├── js/app.js       ← khung app, Trang chủ, Ứng viên
+├── js/tools.js     ← Pha 2: Vị trí (chân dung + phiếu điểm), Lọc CV, Sơ vấn
 ├── Code.gs         ← backend Apps Script (dán vào Google Sheet)
 └── .nojekyll       ← để GitHub Pages phục vụ file nguyên trạng
 ```

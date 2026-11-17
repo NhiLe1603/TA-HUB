@@ -145,13 +145,15 @@ function parseHash() {
 }
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 
-function renderNav(route) {
-  const active = route === "candidate" ? "candidates" : route;
+function renderNav(route, id) {
+  const active = route === "candidate" ? "candidates" : route === "position" ? "positions" : route;
   const html = NAV.map(n => `<a href="#/${n.id}" class="${n.id === active ? "active" : ""}"><span class="ico">${n.ico}</span><span>${n.label}</span></a>`).join("");
   $("#sideNav").innerHTML = html;
   $("#bottomNav").innerHTML = html;
   const cur = NAV.find(n => n.id === active);
-  $("#topTitle").textContent = route === "candidate" ? "Hồ sơ ứng viên" : (cur ? cur.label : "");
+  const sub = { candidate: "Hồ sơ ứng viên", position: "Chân dung & phiếu điểm" }[route]
+    || (route === "tools" && id === "loc-cv" ? "Lọc CV" : route === "tools" && id === "so-van" ? "Sơ vấn" : "");
+  $("#topTitle").textContent = sub || (cur ? cur.label : "");
 }
 
 function renderUserChip() {
@@ -201,11 +203,11 @@ function render() {
   const scrollY = window.scrollY;
   const sameView = render._last === location.hash;
 
-  renderNav(route);
+  renderNav(route, id);
   renderUserChip();
   renderBanner();
   const view = $("#view");
-  const views = { home: viewHome, learn: viewLearn, positions: viewPositions, tools: viewTools, candidates: viewCandidates, candidate: viewCandidate };
+  const views = { home: viewHome, learn: viewLearn, positions: viewPositions, position: viewPosition, tools: viewTools, candidates: viewCandidates, candidate: viewCandidate };
   view.innerHTML = (views[route] || viewHome)(id, query);
 
   if (sameView) {
@@ -299,29 +301,7 @@ function viewLearn() {
       "B1 — Chân dung ứng viên & khai thác quản lý (HM)", "B2 — Viết JD & tin đăng (AIDA)", "B3 — Tạo nguồn & nghiên cứu thị trường",
       "B4 — Phiếu điểm & lọc CV (CWC)", "B5 — Sơ vấn & phỏng vấn (STAR)", "B6 — Quản lý & bàn giao HM"]);
 }
-function viewTools() {
-  return pageHead("🧰 Công cụ", "các công cụ bấm-chọn theo từng bước, ra kết quả dùng được ngay.") +
-    soonBlock("🧰", "Các công cụ sắp có:", ["✍️ Viết JD & tin đăng", "📣 Tạo nguồn (sourcing)", "📄 Lọc CV theo phiếu điểm",
-      "📞 Phiếu sơ vấn", "⚖️ So sánh ứng viên"]);
-}
-function viewPositions() {
-  const list = Store.positions.slice().sort((a, b) => str(a.tenViTri).localeCompare(str(b.tenViTri), "vi"));
-  let html = pageHead("💼 Vị trí", "xem các vị trí đang tuyển. Ở pha sau, mỗi vị trí sẽ có <b>chân dung + phiếu điểm</b> để lọc CV và sơ vấn.");
-  html += `<div class="card"><div class="card-head"><h2>Vị trí đang có (${list.length})</h2>
-    <button class="btn primary sm" data-act="quickPosition" type="button">＋ Tạo nhanh</button></div>`;
-  if (!Store.state.hasData && isConnected()) html += `<div class="skeleton"></div><div class="skeleton"></div>`;
-  else if (!list.length) html += emptyBlock("💼", "Chưa có vị trí nào", "Tạo nhanh 1 vị trí (vd “Tư vấn bán hàng – Q.1”) để gắn ứng viên vào.",
-    `<button class="btn primary" data-act="quickPosition" type="button">＋ Tạo vị trí</button>`);
-  else html += `<div class="list">` + list.map(p => {
-    const n = Store.candidates.filter(c => String(c.posId) === String(p.posId)).length;
-    const g = GROUPS[p.nhom];
-    return `<a class="row" href="#/candidates?posId=${encodeURIComponent(p.posId)}"><span class="avatar">💼</span>
-      <span style="min-width:0"><div class="title">${esc(p.tenViTri)}</div><div class="sub">${esc(g ? g.label : "Chưa chọn nhóm")}</div></span>
-      <span class="meta"><b>${n}</b><span class="muted small">ứng viên</span></span></a>`;
-  }).join("") + `</div>`;
-  html += `</div>` + soonBlock("🧩", "Pha 2 sẽ thêm:", ["Chân dung ứng viên: loại cứng (must-have) + tiêu chí CWC", "Tự sinh phiếu điểm (scorecard)", "Nút “Dùng mẫu” và AI hỗ trợ"]);
-  return html;
-}
+/* viewTools, viewPositions, viewPosition: xem js/tools.js (Pha 2) */
 
 /* ---------------- DANH SÁCH ỨNG VIÊN ---------------- */
 function filteredCandidates() {
@@ -381,13 +361,14 @@ function viewCandidates(_, query) {
 }
 
 /* ---------------- HỒ SƠ ỨNG VIÊN ---------------- */
-function scoreBox(label, scoreRaw, verdict, tipKey, pendingText) {
+function scoreBox(label, scoreRaw, verdict, tipKey, pendingText, link, linkLabel) {
   const n = toNum(scoreRaw);
-  if (n === null) return `<div class="score-box"><div class="lbl">${label} ${tip(tipKey)}</div><div class="big muted">—</div><div class="small muted">${pendingText}</div></div>`;
+  const btn = `<a class="btn sm" style="margin-top:8px" href="${link}">${linkLabel}</a>`;
+  if (n === null) return `<div class="score-box"><div class="lbl">${label} ${tip(tipKey)}</div><div class="big muted">—</div><div class="small muted">${pendingText}</div>${btn.replace("btn sm", "btn sm primary")}</div>`;
   const cls = verdictClass(verdict, n);
   return `<div class="score-box"><div class="lbl">${label} ${tip(tipKey)}</div>
     <div class="big verdict ${cls}">${fmtScore(n)}<span class="small muted"> / 4</span></div>
-    <div class="verdict ${cls}" style="font-weight:600">${esc(verdict || "")}</div></div>`;
+    <div class="verdict ${cls}" style="font-weight:600">${esc(verdict || "")}</div>${btn}</div>`;
 }
 function viewCandidate(id) {
   const c = findCand(id);
@@ -414,7 +395,10 @@ function viewCandidate(id) {
   if (idx < 0) html += `<div class="side-state" style="--c:${meta.color}">${stageBadge(stage)} ${esc(meta.desc)}</div>`;
   else if (meta.next) html += `<p class="next-hint" style="margin-top:8px">👉 Việc tiếp theo: <b>${esc(meta.next)}</b></p>`;
 
+  const cid = encodeURIComponent(c.candId);
   html += `<div class="btn-row" style="margin-top:14px">
+    ${stage === "Mới" ? `<a class="btn primary" href="#/tools/loc-cv?cand=${cid}">📄 Lọc CV ngay</a>` : ""}
+    ${stage === "Đã lọc CV" ? `<a class="btn primary" href="#/tools/so-van?cand=${cid}">📞 Sơ vấn ngay</a>` : ""}
     ${nextStage ? `<button class="btn primary" data-act="nextStage" data-id="${esc(c.candId)}" data-val="${esc(nextStage)}" type="button">Chuyển sang: ${esc(nextStage)} →</button>` : ""}
     <button class="btn" data-act="openStage" data-id="${esc(c.candId)}" type="button">Đổi trạng thái…</button></div></div>`;
 
@@ -428,9 +412,13 @@ function viewCandidate(id) {
 
   // Điểm
   html += `<div class="card"><div class="card-head"><h2>Điểm đánh giá</h2></div><div class="grid two">
-    ${scoreBox("Điểm lọc CV", c.diemCV, c.ketLuanCV, "locCV", "Chưa chấm. Công cụ “Lọc CV” sẽ có ở pha 2.")}
-    ${scoreBox("Điểm sơ vấn", c.diemSoVan, c.ketLuanSoVan, "soVan", "Chưa sơ vấn. Công cụ “Sơ vấn” sẽ có ở pha 2.")}
-  </div></div>`;
+    ${scoreBox("Điểm lọc CV", c.diemCV, c.ketLuanCV, "locCV", "Chưa chấm CV.", `#/tools/loc-cv?cand=${cid}`, toNum(c.diemCV) === null ? "📄 Lọc CV" : "Xem / chấm lại")}
+    ${scoreBox("Điểm sơ vấn", c.diemSoVan, c.ketLuanSoVan, "soVan", "Chưa sơ vấn.", `#/tools/so-van?cand=${cid}`, toNum(c.diemSoVan) === null ? "📞 Sơ vấn" : "Xem / sửa")}
+  </div>`;
+  const ev = asObj(asObj(c.chiTiet).bangChung);
+  if (Object.keys(ev).length) html += `<details class="neo" style="margin-top:12px"><summary><b>Bằng chứng theo tiêu chí</b> (${Object.keys(ev).length})</summary>
+    <dl class="kv" style="margin-top:8px">${Object.keys(ev).map(k => `<dt>${esc(k)}</dt><dd style="white-space:pre-line">${esc(ev[k])}</dd>`).join("")}</dl></details>`;
+  html += `</div>`;
 
   // Thông tin
   html += `<div class="card"><div class="card-head"><h2>Thông tin</h2></div><dl class="kv">
@@ -524,10 +512,10 @@ function positionOptions(selected) {
     .sort((a, b) => str(a.tenViTri).localeCompare(str(b.tenViTri), "vi"))
     .map(p => `<option value="${esc(p.posId)}" ${String(p.posId) === String(selected) ? "selected" : ""}>${esc(p.tenViTri)}</option>`).join("");
 }
-function openCandidateForm(c) {
+function openCandidateForm(c, onSaved) {
   const isNew = !c;
   const user = getUser();
-  M = { kind: "cand", editId: c ? c.candId : null, nguon: c ? str(c.nguon) : "", ta: c ? str(c.taPhuTrach) || user : user, nhom: "Mass" };
+  M = { kind: "cand", editId: c ? c.candId : null, nguon: c ? str(c.nguon) : "", ta: c ? str(c.taPhuTrach) || user : user, nhom: "Mass", onSaved };
   const tas = Array.from(new Set([...TA_NAMES, user, M.ta].filter(Boolean)));
   openModal(isNew ? "＋ Thêm ứng viên" : "✏️ Sửa thông tin", `
     <p class="howto" style="margin:0 0 14px"><span>Chỉ cần <b>tên</b> hoặc <b>mã hồ sơ</b> là lưu được. Các ô còn lại bấm chọn.</span></p>
@@ -556,7 +544,7 @@ function openCandidateForm(c) {
 function openQuickPosition() {
   M = { kind: "pos", nhom: "Mass" };
   openModal("＋ Tạo vị trí nhanh", `
-    <p class="howto" style="margin:0 0 14px"><span>Chỉ cần tên + nhóm. Chân dung & phiếu điểm sẽ làm ở pha sau.</span></p>
+    <p class="howto" style="margin:0 0 14px"><span>Chỉ cần tên + nhóm. Muốn lọc CV/sơ vấn thì cần thêm phiếu điểm: vào <b>Vị trí</b> → bấm tên vị trí.</span></p>
     <label class="field"><span>Tên vị trí</span><input id="q_ten" placeholder="VD: Tư vấn bán hàng – ATINO Q.1" autocomplete="off"></label>
     <div class="field"><span class="field-label">Nhóm ${tip("nhom")}</span>
       <div class="chips">${Object.keys(GROUPS).map(k => `<button class="chip ${k === "Mass" ? "on" : ""}" data-act="pickChip" data-group="nhom" data-val="${k}" type="button">${esc(GROUPS[k].label)}</button>`).join("")}</div>
@@ -591,7 +579,10 @@ function changeStage(id, newStage, note = "") {
 /* --- Chuyển HM --- */
 function hmSummary(c) {
   const cv = toNum(c.diemCV), sv = toNum(c.diemSoVan);
-  const ev = asObj(c.chiTiet).bangChung;
+  const ct = asObj(c.chiTiet);
+  const pos = findPos(c.posId);
+  const sc = pos ? asObj(pos.scorecard) : {};
+  const soVan = asObj(ct.soVan), locCV = asObj(ct.locCV);
   const lines = [
     `📋 TÓM TẮT ỨNG VIÊN — VỊ TRÍ ${posName(c.posId).toUpperCase()}`,
     ``,
@@ -600,12 +591,39 @@ function hmSummary(c) {
     `• Điểm lọc CV: ${cv !== null ? fmtScore(cv) + "/4" + (str(c.ketLuanCV) ? " — " + c.ketLuanCV : "") : "chưa chấm"}`,
     `• Điểm sơ vấn: ${sv !== null ? fmtScore(sv) + "/4" + (str(c.ketLuanSoVan) ? " — " + c.ketLuanSoVan : "") : "chưa sơ vấn"}`
   ];
-  if (ev && typeof ev === "object") {
+  // Loại cứng (ưu tiên kết quả sơ vấn vì đã hỏi trực tiếp)
+  const must = sc.mustHave || [];
+  if (must.length && (soVan.must || locCV.must)) {
+    lines.push(``, `⛔ Loại cứng:`);
+    must.forEach(m => {
+      const s = asObj((soVan.must || {})[m.id]), l = asObj((locCV.must || {})[m.id]);
+      const k = s.k || l.k;
+      const label = { co: "✓ Có", dat: "✓ Đạt", khong: "✕ Không", truot: "✕ Trượt" }[k] || "? Chưa rõ";
+      lines.push(`  ${label} — ${m.ten}${str(s.note) ? " (" + str(s.note) + ")" : ""}`);
+    });
+  }
+  // Điểm từng tiêu chí + bằng chứng
+  const crit = sc.tieuChi || [];
+  const src = soVan.diem ? soVan : locCV.diem ? locCV : null;
+  if (crit.length && src) {
+    lines.push(``, `🔎 Điểm & bằng chứng (${src === soVan ? "sơ vấn" : "lọc CV"}):`);
+    crit.forEach(t => {
+      const e = asObj((src.diem || {})[t.id]);
+      const label = (typeof CWC !== "undefined" && CWC[t.nhom]) ? CWC[t.nhom].label : "";
+      lines.push(`  • ${t.ten}${label ? " [" + label + "]" : ""}: ${e.s ?? "—"}/4${str(e.bc) ? " — " + str(e.bc).replace(/\n+/g, " | ") : ""}`);
+    });
+  } else {
+    const ev = asObj(ct.bangChung);
     const items = Object.keys(ev).filter(k => str(ev[k])).slice(0, 5);
     if (items.length) { lines.push(``, `🔎 Bằng chứng nổi bật:`); items.forEach(k => lines.push(`  - ${k}: ${ev[k]}`)); }
   }
+  if (str(soVan.hoi)) lines.push(``, `💬 Ứng viên hỏi: ${str(soVan.hoi)}`);
   if (str(c.ghiChu)) lines.push(``, `📝 Ghi chú của TA: ${str(c.ghiChu)}`);
-  lines.push(``, `👉 Đề xuất: mời ứng viên phỏng vấn vòng quản lý.`,
+  const v = str(c.ketLuanSoVan) || str(c.ketLuanCV);
+  const de = v === "Đạt" ? "mời ứng viên phỏng vấn vòng quản lý."
+    : v.toLowerCase().includes("chờ") ? "cân nhắc — nhờ anh/chị kiểm tra kỹ phần Can do / Culture fit khi phỏng vấn."
+    : "mời ứng viên phỏng vấn vòng quản lý.";
+  lines.push(``, `👉 Đề xuất: ${de}`,
     `Nhờ anh/chị phản hồi giúp em trong 2 ngày (đồng ý hẹn / không phù hợp) để em giữ ứng viên ạ.`,
     ``, `TA phụ trách: ${str(c.taPhuTrach) || getUser()}`);
   return lines.join("\n");
@@ -796,10 +814,12 @@ const ACTIONS = {
       data.ghiChu = str($("#f_ghiChu").value);
       data.chiTiet = { lichSu: [{ t: new Date().toISOString(), tu: "", den: "Mới", by: getUser(), note: "Thêm ứng viên" }] };
     } else data.candId = M.editId;
+    const onSaved = M.onSaved;
     Store.save({ action: "saveCandidate", candidate: data });
     closeModal();
     toast(isNew ? "Đã thêm ứng viên ✓" : "Đã lưu thay đổi ✓");
-    go("#/candidate/" + encodeURIComponent(data.candId));
+    if (onSaved) onSaved(data.candId);
+    else go("#/candidate/" + encodeURIComponent(data.candId));
   },
 
   saveNote: (el) => {
@@ -915,11 +935,12 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-(function boot() {
+// Khởi động sau khi mọi file js (kể cả tools.js) đã tải xong
+document.addEventListener("DOMContentLoaded", function boot() {
   render();
   renderSavePill();
   if (!getUser()) openLogin();
   if (!isConnected()) Store.setStatus("local");
   else if (Store.state.outbox.length) Store.flush();
   else Store.refresh();
-})();
+});
