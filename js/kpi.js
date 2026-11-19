@@ -55,7 +55,7 @@ const KPI_SUGGEST = [
   { t: "Ứng viên đưa vào Talent Pool", unit: "người", d: "Số hồ sơ tốt được giữ lại cho lần sau." }
 ];
 
-const UI6 = { month: null, ta: null, edit: false, cfg: null };
+const UI6 = { month: null, ta: null, edit: false, cfg: null, editFor: "" };
 const monthKey = d => `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, "0")}`;
 function kpiMonthLabel(k) { const [y, m] = String(k || "").split("_"); return y && m ? `Tháng ${+m}/${y}` : String(k || ""); }
 function shiftMonth(k, n) { const [y, m] = k.split("_").map(Number); return monthKey(new Date(y, m - 1 + n, 1)); }
@@ -205,19 +205,28 @@ function viewKpiEditor() {
   const tasAll = allTAs();
   const kpiOpts = sel => `<option value="">— chọn —</option>` + c.defs.map(d => `<option value="${esc(d.k)}" ${d.k === sel ? "selected" : ""}>${esc(d.t || "(chưa đặt tên)")}</option>`).join("");
   const inp = (path, val, ph, type = "text") => `<input class="input" type="${type}" ${type === "number" ? 'step="any"' : ""} data-kcfg="${path}" value="${esc(val ?? "")}" placeholder="${esc(ph)}" autocomplete="off">`;
+  const who = UI6.editFor || "";
+  const isPriv = d => Array.isArray(d.apply) && d.apply.length > 0;
   let html = `<a class="back" href="#/kpi" data-act="kcfgCancel">← KPI</a>` + pageHead("⚙️ Tuỳ chỉnh bộ KPI",
-    "tự xây bộ KPI cho team: thêm/xoá/sửa chỉ số, đơn vị, chiều tốt, <b>trọng số</b>, nguồn số tự động, và các <b>tỷ lệ</b>. Bấm <b>Lưu bộ KPI</b> để áp dụng cho cả team.");
-  html += `<div class="banner" style="margin:0 0 14px;display:block;font-size:13.5px">💡 Đổi tên/đơn vị không làm mất số liệu cũ. <b>Xoá</b> 1 chỉ số chỉ ẩn nó khỏi bảng — số liệu cũ vẫn nằm trên Sheet, thêm lại sẽ không hiện lại (vì là chỉ số mới).</div>`;
+    "<b>Bước 1:</b> chọn đang xây KPI cho <b>cả team</b> hay cho <b>1 bạn TA</b> ở thanh bên dưới. <b>Bước 2:</b> thêm/sửa chỉ số. <b>Bước 3:</b> bấm <b>Lưu bộ KPI</b> ở cuối trang.");
 
-  // Chỉ số
-  html += `<div class="card"><div class="card-head"><h2>Chỉ số KPI (${c.defs.length})</h2></div>
-    <p class="small muted" style="margin-bottom:8px">Trọng số dùng để tính <b>Điểm KPI tổng</b> của từng người (chỉ tính các chỉ số áp dụng cho người đó). Để 0 nếu chỉ để theo dõi. Mỗi người nên có tổng = 100%:</p>
-    <div id="kcfgW">${kcfgWeightsHtml()}</div>
-    ${c.defs.map((d, i) => `<div class="item-card ${Array.isArray(d.apply) && d.apply.length ? "private" : ""}">
-      <div class="item-head"><b>${i + 1}. ${esc(d.t || "Chỉ số mới")}</b><span class="btn-row" style="flex:0 0 auto;gap:2px">
+  // Chọn đối tượng
+  html += `<div class="card"><div class="field-label">Đang xây KPI cho:</div>
+    <div class="chips who-tabs">
+      <button class="chip ${!who ? "on" : ""}" data-act="kcfgFor" data-val="" type="button">👥 Cả team <span class="count">${c.defs.filter(d => !isPriv(d)).length} chung</span></button>
+      ${tasAll.map(t => { const n = c.defs.filter(d => isPriv(d) && d.apply.includes(t)).length;
+        return `<button class="chip ${who === t ? "on" : ""}" data-act="kcfgFor" data-val="${esc(t)}" type="button">👤 ${esc(t)} <span class="count">${n} riêng</span></button>`; }).join("")}
+    </div>
+    <p class="small muted" style="margin-top:8px">${!who
+      ? "Chỉ số <b>chung</b> — áp dụng cho <b>tất cả</b> TA."
+      : `KPI của <b>${esc(who)}</b> = các chỉ số <b>chung</b> của team + các chỉ số <b>riêng</b> bạn thêm ở đây (chỉ ${esc(who)} có).`}</p>
+    <div id="kcfgW">${kcfgWeightsHtml()}</div></div>`;
+
+  const card = (d, i) => `<div class="item-card ${isPriv(d) ? "private" : ""}">
+      <div class="item-head"><b>${esc(d.t || "Chỉ số mới")}</b>${isPriv(d) ? ` <span class="badge" style="--c:var(--warn)">riêng: ${esc(d.apply.join(", "))}</span>` : ""}<span class="btn-row" style="flex:0 0 auto;gap:2px;margin-left:auto">
         <button class="icon-btn" data-act="kcfgMove" data-i="${i}" data-d="-1" type="button" aria-label="Lên" ${i === 0 ? "disabled" : ""}>↑</button>
         <button class="icon-btn" data-act="kcfgMove" data-i="${i}" data-d="1" type="button" aria-label="Xuống" ${i === c.defs.length - 1 ? "disabled" : ""}>↓</button>
-        <button class="icon-btn" data-act="kcfgDel" data-i="${i}" type="button" aria-label="Xoá">🗑</button></span></div>
+        <button class="icon-btn" data-act="kcfgDel" data-i="${i}" data-for="${esc(who)}" type="button" aria-label="Xoá">🗑</button></span></div>
       <div class="kcfg-grid">
         <label class="field"><span class="small">Tên chỉ số</span>${inp(`defs.${i}.t`, d.t, "VD: Số người đi làm")}</label>
         <label class="field"><span class="small">Đơn vị</span>${inp(`defs.${i}.unit`, d.unit, "VD: người, %, ngày, đ")}</label>
@@ -233,10 +242,24 @@ function viewKpiEditor() {
         <button class="chip ${d.lower ? "on" : ""}" data-act="kcfgLower" data-i="${i}" data-val="1" type="button">⬇ Càng thấp càng tốt</button></div></div>
       <label class="field" style="margin-bottom:0"><span class="small">Số app tự ghi nhận (gợi ý cho ô “thực tế”)</span>
         <select class="input" data-kcfg="defs.${i}.auto">${Object.keys(AUTO_SOURCES).map(k => `<option value="${k}" ${(d.auto || "") === k ? "selected" : ""}>${esc(AUTO_SOURCES[k].t)}</option>`).join("")}</select></label>
-    </div>`).join("")}
-    <button class="btn block" data-act="kcfgAdd" type="button">＋ Thêm chỉ số</button>
-    <div class="field-label small" style="margin-top:12px">Hoặc thêm nhanh từ gợi ý:</div>
-    <div class="chips small-chips">${KPI_SUGGEST.filter(s => !c.defs.some(d => d.t === s.t)).map((s, i) => `<button class="chip" data-act="kcfgSuggest" data-i="${KPI_SUGGEST.indexOf(s)}" type="button">＋ ${esc(s.t)}</button>`).join("")}</div></div>`;
+    </div>`;
+  const idx = c.defs.map((d, i) => ({ d, i }));
+  const addBox = `<button class="btn block primary" data-act="kcfgAdd" data-for="${esc(who)}" type="button">＋ ${who ? `Thêm KPI riêng cho ${esc(who)}` : "Thêm chỉ số chung cho cả team"}</button>
+    <div class="field-label small" style="margin-top:12px">Hoặc thêm nhanh từ gợi ý${who ? ` (riêng cho ${esc(who)})` : ""}:</div>
+    <div class="chips small-chips">${KPI_SUGGEST.filter(s => !c.defs.some(d => d.t === s.t)).map(s => `<button class="chip" data-act="kcfgSuggest" data-i="${KPI_SUGGEST.indexOf(s)}" data-for="${esc(who)}" type="button">＋ ${esc(s.t)}</button>`).join("")}</div>`;
+  if (!who) {
+    const shared = idx.filter(x => !isPriv(x.d)), priv = idx.filter(x => isPriv(x.d));
+    html += `<div class="card"><div class="card-head"><h2>👥 Chỉ số chung (${shared.length})</h2></div>
+      ${shared.map(x => card(x.d, x.i)).join("") || `<p class="small muted">Chưa có chỉ số chung.</p>`}${addBox}</div>`;
+    if (priv.length) html += `<details class="card"><summary><b>👤 KPI riêng của từng người (${priv.length})</b> <span class="muted small">— bấm tên người ở thanh trên để sửa</span></summary>
+      <ul class="tight small" style="margin-top:8px">${priv.map(x => `<li><b>${esc(x.d.t || "(chưa đặt tên)")}</b> — ${esc(x.d.apply.join(", "))}</li>`).join("")}</ul></details>`;
+  } else {
+    const mine = idx.filter(x => isPriv(x.d) && x.d.apply.includes(who)), shared = idx.filter(x => !isPriv(x.d));
+    html += `<div class="card"><div class="card-head"><h2>👤 KPI riêng của ${esc(who)} (${mine.length})</h2></div>
+      ${mine.map(x => card(x.d, x.i)).join("") || `<div class="empty" style="padding:12px"><p>${esc(who)} chưa có KPI riêng. Bấm nút dưới để thêm.</p></div>`}${addBox}</div>`;
+    html += `<details class="card"><summary><b>👥 Chỉ số chung ${esc(who)} cũng có (${shared.length})</b> <span class="muted small">— sửa ở tab “Cả team”</span></summary>
+      <ul class="tight small" style="margin-top:8px">${shared.map(x => `<li>${esc(x.d.t)}${+x.d.w ? ` · trọng số ${x.d.w}%` : ""}</li>`).join("")}</ul></details>`;
+  }
 
   // Tỷ lệ
   html += `<div class="card"><div class="card-head"><h2>Tỷ lệ (${c.rates.length})</h2></div>
@@ -252,9 +275,11 @@ function viewKpiEditor() {
       </div></div>`).join("")}
     <button class="btn block" data-act="kcfgRateAdd" type="button">＋ Thêm tỷ lệ</button></div>`;
 
-  html += `<div class="card"><div class="btn-row">
+  const nPriv = c.defs.filter(isPriv).length;
+  html += `<div class="card"><p class="small muted" style="margin-bottom:10px">Bấm Lưu một lần là lưu <b>tất cả</b>: ${c.defs.length - nPriv} chỉ số chung${nPriv ? ` + ${nPriv} KPI riêng (${Array.from(new Set(c.defs.filter(isPriv).flatMap(d => d.apply))).map(esc).join(", ")})` : ""}.</p>
+    <div class="btn-row">
       <button class="btn" data-act="kcfgCancel" type="button">Huỷ</button>
-      <button class="btn primary" data-act="kcfgSave" type="button">💾 Lưu bộ KPI cho cả team</button></div>
+      <button class="btn primary" data-act="kcfgSave" type="button">💾 Lưu bộ KPI</button></div>
     <div style="text-align:center;margin-top:10px"><button class="btn ghost sm" data-act="kcfgReset" type="button">↺ Khôi phục bộ KPI mặc định</button></div></div>`;
   return html;
 }
@@ -287,7 +312,15 @@ function kpiReportText() {
   return lines.join("\n");
 }
 
-const newKpiKey = () => "k" + Date.now().toString(36) + Math.floor(Math.random() * 100);
+/** Cuộn tới chỉ số vừa thêm (thẻ cuối trong danh sách đang xem) và đặt con trỏ vào ô tên */
+function focusLastCard() {
+  setTimeout(() => {
+    const i = UI6.cfg.defs.length - 1;
+    const f = $(`[data-kcfg="defs.${i}.t"]`);
+    if (f) { f.scrollIntoView({ block: "center" }); f.focus(); }
+  }, 60);
+}
+const newKpiKey = () =>"k" + Date.now().toString(36) + Math.floor(Math.random() * 100);
 function kpiBlocked() {
   if (isConnected() && Store.state.kpiSupported === false) { toast("Cần cập nhật Code.gs trước (xem khung hướng dẫn ở đầu trang)"); window.scrollTo(0, 0); return true; }
   return false;
@@ -315,12 +348,26 @@ Object.assign(ACTIONS, {
   },
 
   /* --- tuỳ chỉnh bộ KPI --- */
-  kpiEdit: () => { UI6.edit = true; UI6.cfg = null; render(); window.scrollTo(0, 0); },
+  kpiEdit: () => { UI6.edit = true; UI6.cfg = null; UI6.editFor = ""; render(); window.scrollTo(0, 0); },
   kcfgCancel: (el, ev) => { if (ev) ev.preventDefault(); UI6.edit = false; UI6.cfg = null; render(); },
-  kcfgAdd: () => { UI6.cfg.defs.push({ k: newKpiKey(), t: "", unit: "", d: "", lower: false, w: 0, auto: "" }); render(); },
-  kcfgSuggest: (el) => { const s = KPI_SUGGEST[+el.dataset.i]; UI6.cfg.defs.push({ k: newKpiKey(), t: s.t, unit: s.unit, d: s.d, lower: !!s.lower, w: 0, auto: "" }); render(); toast(`Đã thêm “${s.t}”`); },
+  kcfgFor: (el) => { UI6.editFor = el.dataset.val; render(); },
+  kcfgAdd: (el) => {
+    const who = el.dataset.for || "";
+    UI6.cfg.defs.push({ k: newKpiKey(), t: "", unit: "", d: "", lower: false, w: 0, auto: "", apply: who ? [who] : [] });
+    render(); focusLastCard();
+  },
+  kcfgSuggest: (el) => {
+    const s = KPI_SUGGEST[+el.dataset.i], who = el.dataset.for || "";
+    UI6.cfg.defs.push({ k: newKpiKey(), t: s.t, unit: s.unit, d: s.d, lower: !!s.lower, w: 0, auto: "", apply: who ? [who] : [] });
+    render(); toast(`Đã thêm “${s.t}”${who ? " cho riêng " + who : " cho cả team"}`);
+  },
   kcfgDel: (el) => {
-    const i = +el.dataset.i, d = UI6.cfg.defs[i];
+    const i = +el.dataset.i, d = UI6.cfg.defs[i], who = el.dataset.for || "";
+    // Ở tab 1 người: KPI riêng dùng chung cho nhiều người → chỉ bỏ người này ra
+    if (who && Array.isArray(d.apply) && d.apply.length > 1 && d.apply.includes(who)) {
+      if (!confirm(`Bỏ “${d.t}” khỏi KPI của ${who}? (Những người khác vẫn giữ.)`)) return;
+      d.apply = d.apply.filter(x => x !== who); render(); return;
+    }
     const used = UI6.cfg.rates.filter(r => r.num === d.k || r.den === d.k);
     if (!confirm(`Xoá chỉ số “${d.t || "chưa đặt tên"}” khỏi bộ KPI?${used.length ? `\n\n⚠️ Đang dùng trong tỷ lệ: ${used.map(r => r.t).join(", ")} — tỷ lệ đó sẽ bị xoá theo.` : ""}`)) return;
     UI6.cfg.defs.splice(i, 1);
@@ -344,11 +391,10 @@ Object.assign(ACTIONS, {
   /* Từ màn chi tiết 1 TA: mở tuỳ chỉnh và thêm sẵn 1 chỉ số riêng cho người đó */
   kcfgAddFor: (el) => {
     const ta = el.dataset.ta;
-    UI6.edit = true;
+    UI6.edit = true; UI6.editFor = ta;
     const c = kpiConfig(); UI6.cfg = { defs: clone(c.defs), rates: clone(c.rates) };
     UI6.cfg.defs.push({ k: newKpiKey(), t: "", unit: "", d: "", lower: false, w: 0, auto: "", apply: [ta] });
-    render();
-    setTimeout(() => { const cards = $$(".item-card"); const last = cards[UI6.cfg.defs.length - 1]; if (last) { last.scrollIntoView({ block: "center" }); const f = last.querySelector("input"); if (f) f.focus(); } }, 60);
+    render(); focusLastCard();
     toast(`Đã thêm 1 chỉ số riêng cho ${ta} — đặt tên rồi bấm Lưu`);
   },
   kcfgLower: (el) => { UI6.cfg.defs[+el.dataset.i].lower = el.dataset.val === "1"; render(); },

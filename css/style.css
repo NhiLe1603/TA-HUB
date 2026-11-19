@@ -758,6 +758,8 @@ a.tool-card:hover { border-color: var(--primary); }
 @media (max-width: 520px) { .kcfg-grid { grid-template-columns: 1fr 1fr; } .kcfg-grid > :first-child { grid-column: 1 / -1; } }
 .icon-btn:disabled { opacity: .3; cursor: default; }
 .item-card.private { border-left: 4px solid var(--warn); }
+.who-tabs .chip { min-height: 42px; }
+.who-tabs .chip.on { box-shadow: 0 0 0 2px var(--primary-soft); }
 .tbl td.na { color: var(--faint); background: repeating-linear-gradient(45deg, transparent 0 6px, var(--bg) 6px 12px); }
 
 /* E-learning */
