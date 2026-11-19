@@ -125,6 +125,8 @@ const Store = (() => {
     positions: cached ? cached.positions || [] : [],
     candidates: cached ? cached.candidates || [] : [],
     logs: cached ? cached.logs || [] : [],
+    kpi: cached ? cached.kpi || [] : [],
+    kpiSupported: cached ? cached.kpiSupported : undefined, // false = backend chưa có tab Kpi
     logsSupported: cached ? cached.logsSupported : undefined, // false = backend cũ chưa có tab Logs
     lastSync: cached ? cached.lastSync || null : null,
     hasData: !!cached,
@@ -142,7 +144,7 @@ const Store = (() => {
     statusListeners.forEach(f => { try { f(status, msg); } catch (e) { console.error(e); } });
   }
   function persist() {
-    LocalDB.set(LS_KEYS.cache, { positions: state.positions, candidates: state.candidates, logs: state.logs.slice(0, 500), logsSupported: state.logsSupported, lastSync: state.lastSync });
+    LocalDB.set(LS_KEYS.cache, { positions: state.positions, candidates: state.candidates, logs: state.logs.slice(0, 500), logsSupported: state.logsSupported, kpi: state.kpi, kpiSupported: state.kpiSupported, lastSync: state.lastSync });
     LocalDB.set(LS_KEYS.outbox, state.outbox);
   }
 
@@ -160,6 +162,7 @@ const Store = (() => {
       case "savePosition": upsert(state.positions, "posId", body.position); break;
       case "deleteCandidate": state.candidates = state.candidates.filter(c => String(c.candId) !== String(body.candId)); break;
       case "deletePosition": state.positions = state.positions.filter(p => String(p.posId) !== String(body.posId)); break;
+      case "saveKpi": upsert(state.kpi, "kpiId", body.kpi); break;
     }
     if (body.log && !state.logs.some(l => l.logId === body.log.logId)) state.logs.unshift(Object.assign({ thoiGian: now }, body.log));
   }
@@ -174,6 +177,8 @@ const Store = (() => {
       state.candidates = json.candidates || [];
       state.logsSupported = Array.isArray(json.logs);
       if (state.logsSupported) state.logs = json.logs;
+      state.kpiSupported = Array.isArray(json.kpi);
+      if (state.kpiSupported) state.kpi = json.kpi;
       state.outbox.forEach(item => applyLocal(item.body)); // giữ các thay đổi chưa gửi
       state.lastSync = new Date().toISOString();
       state.hasData = true;
@@ -248,6 +253,7 @@ const Store = (() => {
     get positions() { return state.positions; },
     get candidates() { return state.candidates; },
     get logs() { return state.logs; },
+    get kpi() { return state.kpi; },
     describe: null, // gán ở js/activity.js
     onChange(f) { changeListeners.push(f); },
     onStatus(f) { statusListeners.push(f); },

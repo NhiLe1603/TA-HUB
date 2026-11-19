@@ -112,10 +112,11 @@ function ideaChips(field, ideas) {
 
 function viewJD(query) {
   const posId = query.get("pos");
-  let html = `<a class="back" href="#/tools">← Công cụ</a>` + pageHead(`✍️ Viết JD & tin đăng ${tip("aida")}`,
+  const { p, cd } = posAndPortrait(posId);
+  let html = p ? workflowBar(p, "m2") + fromBanner(query, p, "m2") : "";
+  html += pageHead(`✍️ Bước 2 · JD & tin đăng ${tip("aida")}`,
     "điền 4 phần theo <b>AIDA</b> (phần lớn bấm chọn) → app ghép sẵn <b>3 bản</b> cho Facebook cá nhân, Fanpage, trang tuyển dụng. Bấm Copy là đăng.");
   html += posPickerHtml("jd", posId);
-  const { p, cd } = posAndPortrait(posId);
   if (!p) return html + (posId && !Store.state.hasData && isConnected() ? loadingBlock() : noPosBlock());
   initScope("jd", "jd_" + p.posId, () => freshJD(p, cd));
   const d = D.jd;
@@ -155,6 +156,7 @@ function viewJD(query) {
     <div class="divider"></div>
     <div class="btn-row"><button class="btn primary" data-act="jdSave" type="button">💾 Lưu tin đăng vào vị trí</button>${backupBtn()}</div>
     ${saved && saved.capNhat ? `<p class="small muted" style="margin-top:8px">Lần lưu trước: ${esc(fmtDate(saved.capNhat, true))}${saved.by ? " · " + esc(saved.by) : ""}</p>` : ""}</div>`;
+  if (p.jd) html += nextStepCard(p, "m2");
   return html;
 }
 
@@ -396,7 +398,7 @@ Object.assign(ACTIONS, {
     Store.save({ action: "savePosition", position: { posId: p.posId, jd, nguoiCapNhat: getUser() } });
     clearDraft(D.jdKey); D.jd = null; D.jdKey = null;
     toast("Đã lưu tin đăng vào vị trí ✓");
-    render();
+    goNextAfter(p.posId, "m2", `#/tools/jd?pos=${encodeURIComponent(p.posId)}`);
   },
 
   /* Sourcing */
@@ -438,9 +440,10 @@ Object.assign(ACTIONS, {
     const nguon = { khuVuc: str(d.khuVuc), research: d.research || {}, kenh: (d.kenh || []).map(k => ({ ten: k.ten, nganSach: +k.nganSach || 0, mucTieu: +k.mucTieu || 0 })), ghiChu: str(d.ghiChu), capNhat: new Date().toISOString(), by: getUser() };
     if (!nguon.kenh.length && !confirm("Chưa chọn kênh nào. Vẫn lưu?")) return;
     Store.save({ action: "savePosition", position: { posId: d.posId, nguon, nguoiCapNhat: getUser() } });
+    const pid = d.posId;
     clearDraft(D.sgKey); D.sg = null; D.sgKey = null;
     toast("Đã lưu kế hoạch nguồn ✓");
-    render();
+    goNextAfter(pid, "m3", `#/tools/nguon?pos=${encodeURIComponent(pid)}`);
   },
 
   /* So sánh */

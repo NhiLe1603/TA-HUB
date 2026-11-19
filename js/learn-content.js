@@ -130,3 +130,76 @@ const LEARN = [
     ]
   }
 ];
+
+/* =============================================================
+ * E-LEARNING 8 MODULE
+ * Mỗi module gồm 3 phần: 📑 Bài giảng · 🤖 Bộ skill cho AI · 🗺️ Sơ đồ SOP
+ *
+ * 👉 THÊM TÀI LIỆU: bỏ file vào thư mục  docs/  trên GitHub (vd docs/module1-slide.pdf)
+ *    rồi thêm 1 dòng vào taiLieu của module, ví dụ:
+ *    taiLieu: [{ ten: "Slide Module 1", loai: "slide", url: "docs/module1-slide.pdf" }]
+ *    loai: "slide" | "pdf" | "video" | "doc" | "link"
+ * 👉 THÊM SKILL: thêm 1 dòng vào skills, có thể là prompt (chữ) hoặc file (url).
+ * ============================================================= */
+const MODULE_CONTENT = {
+  1: {
+    lesson: "b1",
+    taiLieu: [],
+    skills: [
+      { ten: "Soạn chân dung + scorecard", moTa: "Đưa thông tin vị trí và lời HM → AI trả JSON để app tự điền chân dung, loại cứng, tiêu chí CWC.",
+        prompt: () => aiPromptPortrait({ tenViTri: "[tên vị trí]", nhom: "Mass", khuVuc: "[khu vực]", moTa: "[HM nói gì về người cần tuyển]" }) }
+    ],
+    sop: ["Nhận yêu cầu tuyển từ HM", "Hỏi 2 câu cốt lõi: thế nào thì CHẤM ĐẬU ngay? dính gì thì LOẠI ngay?", "“Bóc vỏ hành”: hỏi “cụ thể hơn được không?” tới khi ra hành vi",
+      "Viết chân dung: kết quả 30/60/90 ngày + 3–4 loại cứng", "Gửi HM xác nhận bằng văn bản (Lark)", "Chốt chân dung → sang Module 2 viết JD"]
+  },
+  2: {
+    lesson: "b2",
+    taiLieu: [],
+    skills: [
+      { ten: "Viết tin đăng AIDA", moTa: "AI viết hook, lý do chọn ATINO, việc, quyền lợi, 1 CTA — đúng quy tắc đăng tin.",
+        prompt: () => aiPromptJD({ pos: { tenViTri: "[tên vị trí]" }, cd: { khuVuc: "[khu vực]", mustHave: [] }, d: { thuNhap: "[tổng thu nhập]" } }) }
+    ],
+    sop: ["Lấy chân dung đã được HM xác nhận", "Viết JD nội bộ: việc chính, yêu cầu, quyền lợi", "“Phiên dịch” thành tin đăng theo AIDA",
+      "Kiểm tra 6 quy tắc: không viết HOA · 1 CTA · link ở bình luận · không “khoá học/đa cấp” · ghi tổng thu nhập · không tiêu chí cấm",
+      "Đăng 3 bản: FB cá nhân · Fanpage · Jobsite — dùng ảnh thật"]
+  },
+  3: {
+    lesson: "b3",
+    taiLieu: [],
+    skills: [
+      { ten: "Market Research", moTa: "AI tìm tên gọi vị trí, lương thị trường, đối thủ, kênh nên đăng, mục tiêu CV/tuần.",
+        prompt: () => aiPromptMarket({ pos: { tenViTri: "[tên vị trí]", nhom: "Mass" }, khuVuc: "[khu vực]", jdText: "" }) }
+    ],
+    sop: ["Market research: tên gọi, lương, đối thủ, độ khó khu vực", "Khai thác nguồn trong nhà trước: referral, Talent Pool, luân chuyển nội bộ",
+      "Chọn kênh bằng trình duyệt ẩn danh (xem 5 kết quả đầu)", "Lập kế hoạch: kênh · ngân sách · mục tiêu CV/tuần",
+      "Đo theo số người đi làm thật, không theo CV thô", "Người chưa hợp nhưng có điểm mạnh → đưa vào Talent Pool"]
+  },
+  4: {
+    lesson: "b4",
+    taiLieu: [],
+    skills: [
+      { ten: "Chấm CV theo scorecard", moTa: "AI chấm từng tiêu chí 1–4 hoặc “?”, trích bằng chứng từ CV — để đối chiếu với điểm của bạn.",
+        prompt: () => aiPromptCV({ tenViTri: "[tên vị trí]", scorecard: buildScorecard(withIds(clone({ mustHave: TEMPLATES.Mass.mustHave, tieuChi: TEMPLATES.Mass.tieuChi }))), cvText: "" }) }
+    ],
+    sop: ["Kết quả mong muốn 30/60/90 ngày", "Rút tiêu chí theo CWC (Can do · Want to · Culture fit)", "Định nghĩa bằng hành vi nhìn/nghe thấy được",
+      "Tách loại cứng khỏi tiêu chí chấm điểm", "Thang 4 mức có mô tả neo", "Trọng số: tổng 100%, mỗi tiêu chí 10–40%",
+      "Lọc CV: chấm từng tiêu chí 1–4, không có bằng chứng → “?”", "Kết luận: dưới 2,5 Loại · 2,5–2,9 Cân nhắc · từ 3,0 Đạt"]
+  },
+  5: {
+    lesson: "b6",
+    taiLieu: [],
+    skills: [],
+    sop: ["Mới", "Đã lọc CV", "Đạt sơ vấn", "Chuyển HM — gửi tóm tắt có bằng chứng, hạn phản hồi 2 ngày", "Offer", "Nhận việc",
+      "Nhánh phụ: không đạt → từ chối tử tế · có điểm mạnh → Talent Pool"]
+  },
+  6: {
+    lesson: "b5",
+    taiLieu: [],
+    skills: [],
+    sop: ["Chuẩn bị: đọc CV + scorecard, chọn câu hỏi", "Mở đầu: chào, mục đích, thời lượng, xin phép ghi chú", "Loại cứng: câu đóng Có/Không (ca, khu vực, ngày bắt đầu, lương)",
+      "Thân: hỏi hành vi STAR theo CWC, ứng viên nói ≥70%", "Ứng viên hỏi + đóng: nói bước tiếp & khi nào báo kết quả", "Chấm ngay khi còn nhớ rõ"]
+  },
+  7: { lesson: null, taiLieu: [], skills: [], sop: [] },
+  8: { lesson: null, taiLieu: [], skills: [], sop: [] }
+};
+const DOC_ICON = { slide: "📊", pdf: "📕", video: "🎬", doc: "📄", link: "🔗" };

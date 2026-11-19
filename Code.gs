@@ -16,6 +16,7 @@
  *    - ping                         → {ok,time}
  *    - all                          → {ok, positions:[...], candidates:[...], logs:[...]}   (dùng khi mở app)
  *    - listLogs[&limit&ta]          → {ok, data:[...]}  nhật ký hoạt động, mới nhất trước
+ *    - listKpi                      → {ok, data:[...]}  KPI từng TA theo tháng  (POST saveKpi {kpi:{kpiId,...}})
  *  Mọi lệnh GHI có thể kèm  log:{logId,ta,hanhDong,loai,doiTuongId,ten,chiTiet}  → tự thêm vào tab "Logs"
  *    - listPositions                → {ok, data:[...]}
  *    - listCandidates[&posId&trangThai&ta] → {ok, data:[...]}  (lọc tuỳ chọn)
@@ -49,6 +50,11 @@ var LOG   = 'Logs';
 var LOG_H = ['logId','thoiGian','ta','hanhDong','loai','doiTuongId','ten','chiTiet'];
 var LOG_LIMIT = 500;   // số dòng nhật ký mới nhất trả về cho app
 
+/* KPI từng TA theo tháng (thêm ở bản cập nhật "KPI"). kpiId = "<tên TA>|<YYYY_MM>" */
+var KPI   = 'Kpi';
+var KPI_H = ['kpiId','ta','thang','chiTieu','thucTe','ghiChu','nguoiCapNhat','ngayCapNhat'];
+var KPI_J = ['chiTieu','thucTe'];
+
 /* ----------------------- ĐỌC (GET) ----------------------- */
 function doGet(e){
   try{
@@ -58,7 +64,9 @@ function doGet(e){
     if(action==='all')           return json_({ok:true,
                                       positions: readAll_(POS,  POS_H,  POS_J),
                                       candidates: readAll_(CAND, CAND_H, CAND_J),
-                                      logs: readLogs_(LOG_LIMIT, '')});
+                                      logs: readLogs_(LOG_LIMIT, ''),
+                                      kpi: readAll_(KPI, KPI_H, KPI_J)});
+    if(action==='listKpi')       return json_({ok:true, data: readAll_(KPI, KPI_H, KPI_J)});
     if(action==='listLogs')      return json_({ok:true, data: readLogs_(Number(p.limit)||LOG_LIMIT, p.ta||'')});
     if(action==='listPositions') return json_({ok:true, data: readAll_(POS, POS_H, POS_J)});
     if(action==='listCandidates'){
@@ -94,6 +102,11 @@ function doPost(e){
       result = {ok: deleteById_(CAND, CAND_H, 'candId', body.candId)};
     else if(action==='deletePosition')
       result = {ok: deleteById_(POS, POS_H, 'posId', body.posId)};
+    else if(action==='saveKpi'){
+      var k = body.kpi || {};
+      if(!k.kpiId) return json_({ok:false, error:'Thiếu kpiId'});
+      result = {ok:true, data: upsert_(KPI, KPI_H, KPI_J, 'kpiId', k, 'K')};
+    }
     else return json_({ok:false, error:'Unknown POST action: '+action});
     if(body.log) appendLog_(body.log);   // ghi nhật ký cùng lúc với thao tác
     return json_(result);
@@ -232,4 +245,5 @@ function setup(){
   getSheet_(POS,  POS_H);
   getSheet_(CAND, CAND_H);
   getSheet_(LOG,  LOG_H);
+  getSheet_(KPI,  KPI_H);
 }

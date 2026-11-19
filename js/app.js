@@ -145,15 +145,34 @@ function parseHash() {
 }
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 
-function renderNav(route, id) {
-  const active = route === "candidate" ? "candidates" : route === "position" ? "positions" : route;
-  const html = NAV.map(n => `<a href="#/${n.id}" class="${n.id === active ? "active" : ""}"><span class="ico">${n.ico}</span><span>${n.label}</span></a>`).join("");
-  $("#sideNav").innerHTML = html;
-  $("#bottomNav").innerHTML = html;
-  const cur = NAV.find(n => n.id === active);
-  const sub = { candidate: "Hồ sơ ứng viên", position: "Chân dung & phiếu điểm", activity: "Nhật ký hoạt động" }[route]
-    || (route === "tools" ? ({ "loc-cv": "Lọc CV", "so-van": "Sơ vấn", jd: "Viết JD & tin đăng", nguon: "Tạo nguồn", "so-sanh": "So sánh ứng viên" }[id] || "") : "");
-  $("#topTitle").textContent = sub || (cur ? cur.label : "");
+/** Menu: cột trái (máy tính) = dàn ý 8 module, tính năng khoá có 🔒; thanh dưới (điện thoại) = 4 mục */
+function renderNav(route, id, query) {
+  const f = featureForRoute(route, id, query);
+  const side = `<a class="nav-top ${route === "home" ? "active" : ""}" href="#/home"><span class="ico">🏠</span><span>Trang chủ</span></a>
+    <div class="nav-sec">Quy trình tuyển dụng</div>
+    ${MODULES.map(m => {
+      const anyOpen = m.features.some(x => isOpen(x.f));
+      return `<div class="nav-mod ${anyOpen ? "" : "all-locked"}"><div class="nav-mod-h"><span class="mnum">${m.so}</span><span>${esc(m.ten)}</span></div>
+        ${m.features.map(x => {
+          const F = FEATURES[x.f];
+          return isOpen(x.f)
+            ? `<a class="nav-sub ${f === x.f ? "active" : ""}" href="${x.href}"><span class="ico">${F.ico}</span><span>${esc(F.t)}</span></a>`
+            : `<span class="nav-sub locked" data-act="lockedFeature" data-f="${x.f}" title="Tạm khoá — sẽ mở sau"><span class="ico">🔒</span><span>${esc(F.t)}</span><span class="soon-tag">Sắp mở</span></span>`;
+        }).join("")}</div>`;
+    }).join("")}
+    <div class="nav-sec">Đào tạo</div>
+    <a class="nav-top ${route === "learn" ? "active" : ""}" href="#/learn"><span class="ico">📘</span><span>Học (E-learning)</span></a>`;
+  $("#sideNav").innerHTML = side;
+  const bottom = [
+    { href: "#/home", ico: "🏠", t: "Trang chủ", on: route === "home" },
+    { href: "#/tools", ico: "🧭", t: "Quy trình", on: !["home", "learn", "kpi", "activity"].includes(route) },
+    { href: "#/kpi", ico: "📊", t: "KPI", on: route === "kpi" || route === "activity" },
+    { href: "#/learn", ico: "📘", t: "Học", on: route === "learn" }
+  ];
+  $("#bottomNav").innerHTML = bottom.map(b => `<a href="${b.href}" class="${b.on ? "active" : ""}"><span class="ico">${b.ico}</span><span>${b.t}</span></a>`).join("");
+  const title = route === "home" ? "Trang chủ" : route === "tools" && !id ? "Quy trình tuyển dụng"
+    : route === "candidate" ? "Hồ sơ ứng viên" : f ? FEATURES[f].t : "";
+  $("#topTitle").textContent = title;
 }
 
 function renderUserChip() {
@@ -203,12 +222,13 @@ function render() {
   const scrollY = window.scrollY;
   const sameView = render._last === location.hash;
 
-  renderNav(route, id);
+  renderNav(route, id, query);
   renderUserChip();
   renderBanner();
   const view = $("#view");
-  const views = { home: viewHome, learn: viewLearn, positions: viewPositions, position: viewPosition, tools: viewTools, candidates: viewCandidates, candidate: viewCandidate, activity: viewActivity };
-  view.innerHTML = (views[route] || viewHome)(id, query);
+  const views = { home: viewHome, learn: viewLearn, positions: viewPositions, position: viewPosition, scorecard: viewScorecardList, tools: viewTools, candidates: viewCandidates, candidate: viewCandidate, activity: viewActivity, kpi: viewKpi };
+  const f = featureForRoute(route, id, query);
+  view.innerHTML = f && !isOpen(f) ? lockedView(f) : (views[route] || viewHome)(id, query);
 
   if (sameView) {
     Object.keys(keep).forEach(k => { const el = $(`[data-keep="${k}"]`); if (el && el.value !== keep[k]) el.value = keep[k]; });
@@ -243,18 +263,44 @@ function candRow(c, opts = {}) {
 /* ---------------- TRANG CHỦ ---------------- */
 function viewHome() {
   const user = getUser();
-  const cands = Store.candidates;
-  let html = pageHead(`Chào ${esc(user || "bạn")} 👋`, "xem nhanh tình hình tuyển dụng của cả team và những ứng viên <b>bạn</b> cần xử lý tiếp.");
+  let html = pageHead(`Chào ${esc(user || "bạn")} 👋`, "đây là <b>tiến trình của riêng bạn</b>. Làm lần lượt từng bước — xong bước nào, app tự đưa sang bước tiếp theo.");
 
   html += `<div class="quick">
-    <a class="main" href="#/candidates" data-act="newCandidate"><span class="ico">＋</span>Ứng viên</a>
-    <a href="#/positions"><span class="ico">💼</span>Vị trí</a>
+    <a class="main" href="#/position/new"><span class="ico">＋</span>Vị trí mới</a>
+    <a href="#/kpi"><span class="ico">📊</span>KPI</a>
     <a href="#/learn"><span class="ico">📘</span>Học</a></div>`;
 
   if (!Store.state.hasData && isConnected()) return html + loadingBlock();
 
-  html += onboardingCard();
+  html += myProgressCard();
+  html += learnProgressCard();
+  if (isOpen("ungVien")) html += candidateHomeBlocks();
+  html += recentActivityCard();
+  return html;
+}
 
+/** Tiến trình của riêng người đang dùng: các vị trí bạn đang làm + bước tiếp theo */
+function myProgressCard() {
+  const mine = myPositions();
+  let html = `<div class="card"><div class="card-head"><h2>🧭 Tiến trình của bạn</h2>${mine.length ? `<a class="btn sm" href="#/position/new">＋ Vị trí mới</a>` : ""}</div>`;
+  if (!mine.length) {
+    return html + emptyBlock("🚀", "Bạn chưa bắt đầu vị trí nào", "Bắt đầu từ <b>Bước 1 · Chân dung ứng viên</b>: mô tả người cần tuyển cho 1 vị trí. Mất khoảng 10 phút, có mẫu sẵn.",
+      `<div class="btn-row" style="justify-content:center"><a class="btn primary" href="#/position/new">＋ Bắt đầu Bước 1</a><a class="btn" href="#/learn" data-act="openLesson" data-id="m1">📘 Học Module 1 trước</a></div>`) + `</div>`;
+  }
+  html += `<p class="small muted" style="margin-bottom:6px">Ô số = bước theo module · ✓ đã xong · 🔒 tạm khoá</p><div class="list">`;
+  html += mine.slice(0, 6).map(p => {
+    const nx = nextStep(p);
+    return `<div class="prog-row"><div class="prog-main"><a href="#/position/${encodeURIComponent(p.posId)}?tab=chandung"><b>${esc(p.tenViTri)}</b></a>${miniSteps(p)}</div>
+      ${nx ? `<a class="btn sm primary" href="${nx.href(p.posId)}">Tiếp: Bước ${nx.so} · ${esc(nx.ten)} →</a>` : `<span class="small verdict ok">✓ Xong các bước đang mở</span>`}</div>`;
+  }).join("");
+  return html + `</div>${mine.length > 6 ? `<a class="small" href="#/positions">Xem tất cả ${mine.length} vị trí →</a>` : ""}</div>`;
+}
+
+/** Phễu + Việc của tôi (chỉ hiện khi tính năng Quản lý ứng viên được mở) */
+function candidateHomeBlocks() {
+  const user = getUser();
+  const cands = Store.candidates;
+  let html = "";
   // Phễu
   const count = s => cands.filter(c => stageOf(c) === s).length;
   const max = Math.max(1, ...MAIN_STAGES.map(count));
@@ -288,7 +334,6 @@ function viewHome() {
       <div class="list">${g.list.map(c => candRow(c, { showTA: false })).join("")}</div>`).join("");
   }
   html += `</div>`;
-  html += recentActivityCard();
   return html;
 }
 
@@ -730,6 +775,7 @@ const ACTIONS = {
     const name = custom || M.user;
     if (!name) { $("#userErr").classList.remove("hidden"); return; }
     setUser(name);
+    if (typeof resetDrafts === "function") resetDrafts(); // bản nháp là của riêng từng người
     forceCloseModal();
     toast(`Xin chào ${name}!`);
     render();
@@ -766,7 +812,8 @@ const ACTIONS = {
   },
   clearApi: () => { LocalDB.remove(LS_KEYS.apiOverride); Store.refresh(); render(); openSettings(); },
 
-  newCandidate: (el, ev) => { ev.preventDefault(); openCandidateForm(null); },
+  newCandidate: (el, ev) => { ev.preventDefault(); if (!isOpen("ungVien")) { ACTIONS.lockedFeature({ dataset: { f: "ungVien" } }); return; } openCandidateForm(null); },
+  lockedFeature: (el) => { const F = FEATURES[el.dataset.f] || {}; toast(`🔒 “${F.t || "Tính năng này"}” đang tạm khoá — sẽ mở sau`); },
   editCandidate: (el) => openCandidateForm(findCand(el.dataset.id)),
   quickPosition: () => openQuickPosition(),
 

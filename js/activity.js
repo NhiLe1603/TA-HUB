@@ -34,12 +34,18 @@ Store.describe = function (body) {
     const p = body.position, old = findPos(p.posId);
     const ten = str(p.tenViTri) || (old ? str(old.tenViTri) : "");
     let hanhDong, chiTiet = "";
-    if (!old) { hanhDong = p.scorecard ? "Tạo vị trí + phiếu điểm" : "Tạo vị trí"; chiTiet = (GROUPS[p.nhom] || {}).label || ""; }
+    if (!old) { hanhDong = body.step === "chandung" ? "Tạo vị trí + chân dung" : p.scorecard ? "Tạo vị trí + phiếu điểm" : "Tạo vị trí"; chiTiet = (GROUPS[p.nhom] || {}).label || ""; }
+    else if (body.step === "scorecard") { hanhDong = "Lưu scorecard"; chiTiet = `${(p.chanDung.tieuChi || []).length} tiêu chí`; }
+    else if (body.step === "chandung") { hanhDong = "Cập nhật chân dung"; chiTiet = `${(p.chanDung.mustHave || []).length} loại cứng`; }
     else if (p.chanDung) { hanhDong = "Cập nhật chân dung & phiếu điểm"; chiTiet = `${(p.chanDung.tieuChi || []).length} tiêu chí · ${(p.chanDung.mustHave || []).length} loại cứng`; }
     else if (p.jd) { hanhDong = "Lưu tin đăng"; }
     else if (p.nguon) { hanhDong = "Lưu kế hoạch nguồn"; chiTiet = (p.nguon.kenh || []).map(k => k.ten).join(", "); }
     else { hanhDong = "Sửa vị trí"; }
     return Object.assign(base, { hanhDong, loai: "vi-tri", doiTuongId: p.posId, ten, chiTiet });
+  }
+  if (body.action === "saveKpi") {
+    const k = body.kpi || {};
+    return Object.assign(base, { hanhDong: "Cập nhật KPI", loai: "kpi", doiTuongId: k.kpiId, ten: `${k.ta} · ${kpiMonthLabel(k.thang)}`, chiTiet: "" });
   }
   if (body.action === "deletePosition") {
     const old = findPos(body.posId);
@@ -52,7 +58,7 @@ Store.describe = function (body) {
 const ACT_ICON = {
   "Thêm ứng viên": "➕", "Lọc CV": "📄", "Sơ vấn": "📞", "Đổi trạng thái": "🔀", "Sửa ghi chú": "📝",
   "Sửa thông tin ứng viên": "✏️", "Xoá ứng viên": "🗑", "Tạo vị trí": "💼", "Tạo vị trí + phiếu điểm": "💼",
-  "Cập nhật chân dung & phiếu điểm": "📐", "Lưu tin đăng": "✍️", "Lưu kế hoạch nguồn": "📣", "Sửa vị trí": "✏️", "Xoá vị trí": "🗑"
+  "Cập nhật chân dung & phiếu điểm": "📐", "Tạo vị trí + chân dung": "🎯", "Cập nhật chân dung": "🎯", "Lưu scorecard": "📐", "Cập nhật KPI": "📊", "Lưu tin đăng": "✍️", "Lưu kế hoạch nguồn": "📣", "Sửa vị trí": "✏️", "Xoá vị trí": "🗑"
 };
 const dayKey = d => { const x = new Date(d); return isNaN(x) ? "" : `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`; };
 function dayLabel(d) {
@@ -66,7 +72,8 @@ function dayLabel(d) {
 const hhmm = d => { const x = new Date(d); return isNaN(x) ? "" : `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 function logLink(l) {
   if (l.loai === "ung-vien" && findCand(l.doiTuongId)) return "#/candidate/" + encodeURIComponent(l.doiTuongId);
-  if (l.loai === "vi-tri" && findPos(l.doiTuongId)) return "#/position/" + encodeURIComponent(l.doiTuongId);
+  if (l.loai === "vi-tri" && findPos(l.doiTuongId)) return "#/position/" + encodeURIComponent(l.doiTuongId) + (l.hanhDong === "Lưu scorecard" ? "?tab=scorecard" : "?tab=chandung");
+  if (l.loai === "kpi") return "#/kpi";
   return "";
 }
 function logRow(l, { showTA = true } = {}) {

@@ -18,15 +18,19 @@ Object.assign(TIPS, {
 /* ---------------- BẢN NHÁP (giữ chữ đang gõ, kể cả khi tắt app) ---------------- */
 const DRAFT_PREFIX = "atino_draft_";
 const D = { pd: null, pdKey: null, lc: null, lcKey: null, sv: null, svKey: null };
-const loadDraft = key => LocalDB.get(DRAFT_PREFIX + key, null);
-const clearDraft = key => LocalDB.remove(DRAFT_PREFIX + key);
+// Bản nháp gắn với TÊN người dùng → mỗi TA có nháp riêng, kể cả khi dùng chung 1 máy
+const draftK = key => DRAFT_PREFIX + userSlug() + "_" + key;
+const loadDraft = key => LocalDB.get(draftK(key), null);
+const clearDraft = key => LocalDB.remove(draftK(key));
 const draftTimers = {};
 function persistDraft(scope) {
   clearTimeout(draftTimers[scope]);
-  const obj = D[scope], key = D[scope + "Key"];
+  const obj = D[scope], key = D[scope + "Key"], full = draftK(key);
   // Chỉ ghi nếu vẫn đang sửa đúng bản nháp đó (tránh ghi lại nháp ngay sau khi vừa lưu lên Sheet)
-  draftTimers[scope] = setTimeout(() => { if (obj && D[scope] === obj && D[scope + "Key"] === key) LocalDB.set(DRAFT_PREFIX + key, obj); }, 300);
+  draftTimers[scope] = setTimeout(() => { if (obj && D[scope] === obj && D[scope + "Key"] === key) LocalDB.set(full, obj); }, 300);
 }
+/** Đổi người dùng → bỏ bản nháp đang mở trong bộ nhớ */
+function resetDrafts() { Object.keys(D).forEach(k => { D[k] = null; }); Object.keys(draftTimers).forEach(k => clearTimeout(draftTimers[k])); }
 const clone = o => JSON.parse(JSON.stringify(o));
 const uid = p => p + Date.now().toString(36) + Math.floor(Math.random() * 100);
 function getPath(obj, path) { return path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj); }
@@ -147,9 +151,13 @@ function portraitText(p, cd) {
   }
   lines.push(`⛔ LOẠI CỨNG (thiếu 1 là loại):`);
   (cd.mustHave || []).forEach((m, i) => lines.push(`  ${i + 1}. ${m.ten}`));
-  lines.push(``, `✅ TIÊU CHÍ CHẤM (thang 1–4):`);
-  (cd.tieuChi || []).forEach(t => lines.push(`  • ${t.ten} [${g(t.nhom)} · ${t.trongSo}%]${str(t.hanhVi) ? " — " + t.hanhVi : ""}`));
-  lines.push(``, `Ngưỡng: dưới 2,5 Loại · 2,5–2,9 Cân nhắc · từ 3,0 Đạt.`, ``,
+  const tc = (cd.tieuChi || []).filter(t => str(t.ten));
+  if (tc.length) {
+    lines.push(``, `✅ TIÊU CHÍ CHẤM (thang 1–4):`);
+    tc.forEach(t => lines.push(`  • ${t.ten} [${g(t.nhom)} · ${t.trongSo}%]${str(t.hanhVi) ? " — " + t.hanhVi : ""}`));
+    lines.push(``, `Ngưỡng: dưới 2,5 Loại · 2,5–2,9 Cân nhắc · từ 3,0 Đạt.`);
+  }
+  lines.push(``,
     `👉 Anh/chị xem giúp em chân dung này đã đúng ý chưa, cần thêm/bớt gì không ạ? Em sẽ dùng đúng bản này để lọc CV và sơ vấn.`);
   return lines.join("\n");
 }
@@ -157,26 +165,36 @@ function portraitText(p, cd) {
 /* =============================================================
  * MÀN VỊ TRÍ — DANH SÁCH
  * ============================================================= */
-function viewPositions() {
-  const list = Store.positions.slice().sort((a, b) => str(a.tenViTri).localeCompare(str(b.tenViTri), "vi"));
-  let html = pageHead("💼 Vị trí", "tạo <b>chân dung ứng viên + phiếu điểm</b> cho từng vị trí. Làm 1 lần, dùng lại cho lọc CV và sơ vấn (“một thước đo cho cả 3 vòng”).",
-    `<div style="margin-top:10px"><a class="btn primary" href="#/position/new">＋ Tạo vị trí</a></div>`);
-  html += `<div class="card">`;
-  if (!Store.state.hasData && isConnected()) html += `<div class="skeleton"></div><div class="skeleton"></div>`;
-  else if (!list.length) html += emptyBlock("💼", "Chưa có vị trí nào", "Tạo vị trí đầu tiên — bấm <b>Dùng mẫu</b> là có sẵn chân dung nhân viên bán hàng, chỉ cần sửa lại.",
-    `<a class="btn primary" href="#/position/new">＋ Tạo vị trí</a>`);
-  else html += `<div class="list">` + list.map(p => {
-    const n = Store.candidates.filter(c => String(c.posId) === String(p.posId)).length;
+/** Danh sách vị trí — dùng cho Module 1 (Chân dung) và Module 4 (Scorecard) */
+function positionListHtml(mode) {
+  const mineIds = new Set(myPositions().map(p => String(p.posId)));
+  const list = Store.positions.slice().sort((a, b) => (mineIds.has(String(b.posId)) - mineIds.has(String(a.posId))) || new Date(b.ngayCapNhat || 0) - new Date(a.ngayCapNhat || 0));
+  if (!Store.state.hasData && isConnected()) return `<div class="card"><div class="skeleton"></div><div class="skeleton"></div></div>`;
+  if (!list.length) return `<div class="card">${emptyBlock("💼", "Chưa có vị trí nào", "Bắt đầu từ <b>Bước 1 · Chân dung ứng viên</b> — bấm <b>Dùng mẫu</b> là có sẵn chân dung nhân viên bán hàng, chỉ cần sửa lại.",
+    `<a class="btn primary" href="#/position/new">＋ Tạo vị trí (Bước 1)</a>`)}</div>`;
+  const row = p => {
     const g = GROUPS[p.nhom];
-    const sc = asObj(p.scorecard);
-    const ready = hasScorecard(p);
-    return `<a class="row" href="#/position/${encodeURIComponent(p.posId)}"><span class="avatar">💼</span>
+    const href = `#/position/${encodeURIComponent(p.posId)}?tab=${mode}`;
+    const status = mode === "scorecard"
+      ? (hasScorecard(p) ? `<span class="badge" style="--c:var(--ok)">Có scorecard · ${(asObj(p.scorecard).tieuChi || []).length} tiêu chí</span>` : `<span class="badge" style="--c:var(--warn)">Chưa có scorecard</span>`)
+      : miniSteps(p);
+    return `<a class="row" href="${href}"><span class="avatar">💼</span>
       <span style="min-width:0"><div class="title">${esc(p.tenViTri)}</div>
-      <div class="sub">${esc(g ? g.label : "Chưa chọn nhóm")} · ${n} ứng viên</div></span>
-      <span class="meta">${ready ? `<span class="badge" style="--c:var(--ok)">Có phiếu điểm</span><span class="muted small">${(sc.tieuChi || []).length} tiêu chí</span>`
-        : `<span class="badge" style="--c:var(--warn)">Chưa có phiếu điểm</span>`}</span></a>`;
-  }).join("") + `</div>`;
-  return html + `</div>`;
+      <div class="sub">${esc(g ? g.label : "Chưa chọn nhóm")}${str(p.nguoiCapNhat) ? " · " + esc(p.nguoiCapNhat) : ""}</div></span>
+      <span class="meta">${status}</span></a>`;
+  };
+  const mine = list.filter(p => mineIds.has(String(p.posId))), team = list.filter(p => !mineIds.has(String(p.posId)));
+  let html = "";
+  if (mine.length) html += `<div class="card"><div class="card-head"><h2>Vị trí của bạn (${mine.length})</h2></div><div class="list">${mine.map(row).join("")}</div></div>`;
+  if (team.length) html += `<details class="card" ${mine.length ? "" : "open"}><summary><b>Vị trí của cả team (${team.length})</b> <span class="muted small">— xem, dùng lại làm mẫu</span></summary><div class="list" style="margin-top:8px">${team.map(row).join("")}</div></details>`;
+  return html;
+}
+function viewPositions() {
+  return pageHead("🎯 Module 1 · Chân dung ứng viên", "mô tả <b>người cần tuyển</b> cho từng vị trí: hỏi HM, viết loại cứng và kết quả 30/60/90 ngày. Xong chân dung, app tự đưa bạn sang bước viết JD.",
+    `<div style="margin-top:10px"><a class="btn primary" href="#/position/new">＋ Tạo vị trí mới</a></div>`) + positionListHtml("chandung");
+}
+function viewScorecardList() {
+  return pageHead("📐 Module 4 · Xây dựng Scorecard", "chọn vị trí để làm <b>scorecard</b> (tiêu chí CWC, trọng số, mô tả 4 mức). Đây là thước đo chung cho lọc CV và phỏng vấn.") + positionListHtml("scorecard");
 }
 
 /* =============================================================
@@ -238,27 +256,34 @@ function critEditHtml(t, i) {
     </details></div>`;
 }
 
-function viewPosition(id) {
+function viewPosition(id, query) {
+  const tab = query && query.get("tab") === "scorecard" ? "scorecard" : "chandung";
+  const back = tab === "scorecard" ? `<a class="back" href="#/scorecard">← Module 4 · Scorecard</a>` : `<a class="back" href="#/positions">← Module 1 · Chân dung</a>`;
   if (id !== "new" && !findPos(id)) {
     if (!Store.state.hasData && isConnected()) return loadingBlock();
-    return `<a class="back" href="#/positions">← Vị trí</a><div class="card">${emptyBlock("🤷", "Không tìm thấy vị trí", "Có thể vị trí đã bị xoá.", `<a class="btn primary" href="#/positions">Về danh sách</a>`)}</div>`;
+    return back + `<div class="card">${emptyBlock("🤷", "Không tìm thấy vị trí", "Có thể vị trí đã bị xoá.", `<a class="btn primary" href="#/positions">Về danh sách</a>`)}</div>`;
   }
   initPortrait(id);
   const d = D.pd;
   const isNew = !d.posId;
+  const p = isNew ? null : findPos(d.posId);
   const hasDraft = !!loadDraft(D.pdKey);
-  let html = `<a class="back" href="#/positions">← Vị trí</a>`;
-  html += pageHead(isNew ? "＋ Tạo vị trí" : "✏️ " + esc(d.tenViTri || "Vị trí"),
-    "mô tả <b>người mình cần</b> → app tự làm <b>phiếu điểm</b> để lọc CV và sơ vấn. Không biết bắt đầu? Bấm <b>Dùng mẫu</b> rồi sửa lại.");
-  if (hasDraft) html += `<div class="banner" style="margin:0 0 14px"><span>📝 Bản nháp trên máy này — <b>chưa lưu lên Sheet</b>.</span><button class="btn sm" data-act="discardDraft" data-scope="pd" type="button">Bỏ nháp</button></div>`;
-
-  html += `<details class="card guide"><summary><b>📐 Phiếu điểm làm theo 7 bước</b> <span class="muted small">(bấm để xem)</span></summary>
-    <ol class="steps7">${SCORECARD_STEPS.map(s => `<li>${s}</li>`).join("")}</ol></details>`;
+  let html = back;
+  if (tab === "scorecard" && isNew) return html + `<div class="card">${emptyBlock("🎯", "Làm chân dung trước", "Scorecard được xây từ chân dung. Hãy làm Bước 1 trước.", `<a class="btn primary" href="#/position/new">Bước 1 · Chân dung</a>`)}</div>`;
+  html += p ? workflowBar(p, tab === "scorecard" ? "m4" : "m1") : "";
+  html += fromBanner(query, p, tab === "scorecard" ? "m4" : "m1");
+  html += tab === "scorecard"
+    ? pageHead(`📐 Bước 4 · Scorecard — ${esc(d.tenViTri)}`, "đặt <b>tiêu chí chấm điểm (CWC)</b>, trọng số và mô tả 4 mức. Đây là thước đo dùng cho lọc CV và phỏng vấn — ai chấm cũng ra gần giống nhau.")
+    : pageHead(isNew ? "🎯 Bước 1 · Chân dung ứng viên" : `🎯 Bước 1 · Chân dung — ${esc(d.tenViTri || "Vị trí")}`,
+      "mô tả <b>người mình cần</b>: thông tin vị trí, kết quả mong muốn, loại cứng. Không biết bắt đầu? Bấm <b>Dùng mẫu</b> rồi sửa lại.");
+  if (hasDraft) html += `<div class="banner" style="margin:0 0 14px"><span>📝 Bản nháp của bạn trên máy này — <b>chưa lưu lên Sheet</b>.</span><button class="btn sm" data-act="discardDraft" data-scope="pd" type="button">Bỏ nháp</button></div>`;
 
   html += `<div class="card"><div class="card-head"><h2>⚡ Bắt đầu nhanh</h2></div>
-    <p class="small muted" style="margin-bottom:10px">Dùng mẫu có sẵn theo nhóm, hoặc nhờ AI soạn rồi dán kết quả về.</p>
-    <div class="btn-row">${Object.keys(TEMPLATES).map(k => `<button class="btn" data-act="pdTemplate" data-val="${k}" type="button">📋 Mẫu ${esc(GROUPS[k].label.split(" – ")[0])}</button>`).join("")}
+    <p class="small muted" style="margin-bottom:10px">Dùng mẫu có sẵn theo nhóm, hoặc nhờ AI soạn rồi dán kết quả về.${tab === "chandung" ? " Mẫu/AI điền luôn cả tiêu chí cho Bước 4." : ""}</p>
+    <div class="btn-row">${Object.keys(TEMPLATES).map(k => `<button class="btn" data-act="pdTemplate" data-val="${k}" data-tab="${tab}" type="button">📋 Mẫu ${esc(GROUPS[k].label.split(" – ")[0])}</button>`).join("")}
     <button class="btn primary" data-act="pdAI" type="button">🤖 Nhờ AI soạn</button></div></div>`;
+
+  if (tab === "scorecard") return html + scorecardSectionHtml(d, p);
 
   // Bước 1
   html += `<div class="card"><div class="card-head"><h2><span class="snum">1</span> Thông tin & kết quả mong muốn</h2></div>
@@ -281,30 +306,37 @@ function viewPosition(id) {
     ${mh.map(mustRowHtml).join("")}
     <button class="btn block" data-act="pdAdd" data-list="mustHave" type="button">＋ Thêm loại cứng</button></div>`;
 
-  // Tiêu chí
-  html += `<div class="card"><div class="card-head"><h2><span class="snum">3</span> Tiêu chí chấm điểm (CWC) ${tip("cwc")}</h2><span class="muted small">${d.tieuChi.length} tiêu chí</span></div>
+  // Lưu chân dung
+  html += `<div class="card"><div class="card-head"><h2><span class="snum">3</span> Gửi HM xác nhận & lưu</h2></div>
+    <p class="small muted" style="margin-bottom:10px">Gửi chân dung cho HM <b>xác nhận bằng văn bản</b> (copy dán Lark) trước khi tuyển.</p>
+    <div class="btn-row">
+      <button class="btn" data-act="pdCopyHM" type="button">📋 Copy gửi HM xác nhận</button>
+      <button class="btn primary" data-act="pdSave" data-mode="chandung" type="button">💾 Lưu & sang bước tiếp →</button></div>
+    <div style="text-align:right;margin-top:6px">${backupBtn()}</div>
+    ${!isNew ? `<div style="text-align:center;margin-top:12px"><button class="btn ghost" style="color:var(--bad)" data-act="pdDelete" type="button">🗑 Xoá vị trí này</button></div>` : ""}</div>`;
+  if (p && WORKFLOW[0].done(p)) html += nextStepCard(p, "m1");
+  return html;
+}
+
+/** Bước 4 · Scorecard (tiêu chí CWC + trọng số + neo) */
+function scorecardSectionHtml(d, p) {
+  let html = `<details class="card guide"><summary><b>📐 Scorecard làm theo 7 bước</b> <span class="muted small">(bấm để xem)</span></summary>
+    <ol class="steps7">${SCORECARD_STEPS.map(s => `<li>${s}</li>`).join("")}</ol></details>`;
+  const mh = d.mustHave || [];
+  html += `<div class="card"><div class="card-head"><h2>⛔ Loại cứng (từ Bước 1)</h2><a class="btn sm" href="#/position/${encodeURIComponent(d.posId)}?tab=chandung">Sửa ở Bước 1</a></div>
+    ${mh.length ? `<ul class="tight small">${mh.map(m => `<li>${esc(m.ten)}</li>`).join("")}</ul>` : `<p class="small muted">Chưa có loại cứng — nên thêm 3–4 cái ở Bước 1.</p>`}</div>`;
+  html += `<div class="card"><div class="card-head"><h2><span class="snum">A</span> Tiêu chí chấm điểm (CWC) ${tip("cwc")}</h2><span class="muted small">${d.tieuChi.length} tiêu chí</span></div>
     <div class="cwc-explain">${CWC_KEYS.map(k => `<div style="--c:${CWC[k].color}"><b>${CWC[k].label}</b><span>${CWC[k].vi}</span></div>`).join("")}</div>
     <p class="small muted" style="margin:10px 0">Nên có <b>4–6 tiêu chí</b>, mỗi nhóm ít nhất 1. Mỗi tiêu chí chấm 1–4 điểm.</p>
     <div id="pdWeight">${weightBoxHtml()}</div>
     ${d.tieuChi.length ? d.tieuChi.map(critEditHtml).join("") : `<div class="empty" style="padding:12px"><p>Chưa có tiêu chí. Bấm <b>Dùng mẫu</b> ở trên cho nhanh, hoặc thêm từng cái.</p></div>`}
     <button class="btn block" data-act="pdAdd" data-list="tieuChi" type="button">＋ Thêm tiêu chí</button></div>`;
-
-  // Lưu
-  html += `<div class="card"><div class="card-head"><h2><span class="snum">4</span> Xem phiếu điểm & lưu</h2></div>
-    <p class="small muted" style="margin-bottom:10px">Trước khi lọc CV: gửi chân dung cho HM <b>xác nhận bằng văn bản</b> (copy dán Lark).</p>
-    <div class="btn-row">
-      <button class="btn" data-act="pdCopyHM" type="button">📋 Copy gửi HM xác nhận</button>
-      <button class="btn primary" data-act="pdSave" type="button">💾 Lưu vị trí</button></div>
-    <div style="text-align:right;margin-top:6px">${backupBtn()}</div>
-    ${!isNew ? `<div style="text-align:center;margin-top:12px"><button class="btn ghost" style="color:var(--bad)" data-act="pdDelete" type="button">🗑 Xoá vị trí này</button></div>` : ""}</div>`;
-  if (!isNew) {
-    const q = "?pos=" + encodeURIComponent(d.posId);
-    html += `<div class="card"><div class="card-head"><h2>➡️ Bước tiếp theo cho vị trí này</h2></div><div class="tool-grid" style="margin:0">
-      <a class="tool-card" href="#/tools/jd${q}"><span class="ico">✍️</span><span><b>Viết tin đăng</b><span class="d">AIDA, 3 bản</span></span><span class="go">→</span></a>
-      <a class="tool-card" href="#/tools/nguon${q}"><span class="ico">📣</span><span><b>Tạo nguồn</b><span class="d">Kênh + kế hoạch</span></span><span class="go">→</span></a>
-      <a class="tool-card" href="#/tools/so-sanh${q}"><span class="ico">⚖️</span><span><b>So sánh ứng viên</b><span class="d">Xếp hạng theo điểm</span></span><span class="go">→</span></a>
-      <a class="tool-card" href="#/candidates?posId=${encodeURIComponent(d.posId)}"><span class="ico">👥</span><span><b>Ứng viên của vị trí</b><span class="d">Danh sách & trạng thái</span></span><span class="go">→</span></a></div></div>`;
-  }
+  html += `<div class="card"><div class="card-head"><h2><span class="snum">B</span> Lưu scorecard</h2></div>
+    <p class="small muted" style="margin-bottom:10px">Ngưỡng kết luận: dưới 2,5 Loại · 2,5–2,9 Cân nhắc · từ 3,0 Đạt.</p>
+    <div class="btn-row"><button class="btn" data-act="pdCopyHM" type="button">📋 Copy chân dung + scorecard gửi HM</button>
+      <button class="btn primary" data-act="pdSave" data-mode="scorecard" type="button">💾 Lưu scorecard</button></div>
+    <div style="text-align:right;margin-top:6px">${backupBtn()}</div></div>`;
+  if (p && hasScorecard(p)) html += nextStepCard(p, "m4");
   return html;
 }
 
@@ -317,26 +349,20 @@ function viewTools(id, query) {
   if (id === "jd") return viewJD(query);
   if (id === "nguon") return viewSourcing(query);
   if (id === "so-sanh") return viewCompare(query);
-  const user = getUser();
-  const mine = Store.candidates.filter(c => str(c.taPhuTrach) === user);
-  const needCV = sortRecent(mine.filter(c => stageOf(c) === "Mới")).slice(0, 5);
-  const needSV = sortRecent(mine.filter(c => stageOf(c) === "Đã lọc CV")).slice(0, 5);
-  const tool = (href, ico, t, d, soon) => soon
-    ? `<div class="tool-card soon-card"><span class="ico">${ico}</span><span><b>${t}</b><span class="d">${d}</span></span><span class="badge">Pha 3</span></div>`
-    : `<a class="tool-card" href="${href}"><span class="ico">${ico}</span><span><b>${t}</b><span class="d">${d}</span></span><span class="go">→</span></a>`;
-  let html = pageHead("🧰 Công cụ", "các công cụ bấm-chọn theo từng bước, ra kết quả dùng được ngay.");
-  html += `<div class="tool-grid">
-    ${tool("#/tools/loc-cv", "📄", "Lọc CV", "Chấm hồ sơ theo phiếu điểm, có AI đối chiếu")}
-    ${tool("#/tools/so-van", "📞", "Sơ vấn", "Phiếu gọi sơ bộ 6 phần, có câu hỏi gợi ý")}
-    ${tool("#/tools/jd", "✍️", "Viết JD & tin đăng", "AIDA, ra 3 bản cho 3 kênh")}
-    ${tool("#/tools/nguon", "📣", "Tạo nguồn", "Nghiên cứu thị trường + kế hoạch kênh")}
-    ${tool("#/tools/so-sanh", "⚖️", "So sánh ứng viên", "Bảng điểm, xếp hạng, gợi ý chọn")}
-  </div>`;
-  const quick = (title, list, toolId, empty) => `<div class="card"><div class="card-head"><h2>${title}</h2></div>${list.length
-    ? `<div class="list">${list.map(c => `<a class="row" href="#/tools/${toolId}?cand=${encodeURIComponent(c.candId)}"><span class="avatar">${esc(initials(candName(c)))}</span>
-        <span style="min-width:0"><div class="title">${esc(candName(c))}</div><div class="sub">${esc(posName(c.posId))}</div></span><span class="meta"><span class="btn sm">Làm →</span></span></a>`).join("")}</div>`
-    : `<p class="muted small">${empty}</p>`}</div>`;
-  html += `<div class="grid two">${quick("📄 Chờ lọc CV (của bạn)", needCV, "loc-cv", "Không có ứng viên “Mới” nào của bạn.")}${quick("📞 Chờ sơ vấn (của bạn)", needSV, "so-van", "Không có ứng viên “Đã lọc CV” nào của bạn.")}</div>`;
+  return viewProcess();
+}
+
+/** Trang "Quy trình tuyển dụng": dàn ý 8 module, tính năng nào mở thì bấm được, khoá thì có 🔒 */
+function viewProcess() {
+  let html = pageHead("🧭 Quy trình tuyển dụng", "toàn bộ tính năng của app, xếp theo <b>8 module</b>. Tính năng có 🔒 đang tạm khoá và <b>sẽ mở sau</b>.");
+  html += MODULES.map(m => `<div class="card mod-card"><div class="mod-h"><span class="mnum big">${m.so}</span><b>${esc(m.ten)}</b></div>
+    <div class="tool-grid" style="margin:10px 0 0">${m.features.map(x => {
+      const F = FEATURES[x.f];
+      return isOpen(x.f)
+        ? `<a class="tool-card" href="${x.href}"><span class="ico">${F.ico}</span><span><b>${esc(F.t)}</b><span class="d">${esc(F.d)}</span></span><span class="go">→</span></a>`
+        : `<div class="tool-card soon-card" data-act="lockedFeature" data-f="${x.f}"><span class="ico">🔒</span><span><b>${esc(F.t)}</b><span class="d">${esc(F.d)}</span></span><span class="badge">Sắp mở</span></div>`;
+    }).join("")}</div>
+    <a class="small" style="display:inline-block;margin-top:8px" href="#/learn" data-act="openLesson" data-id="m${m.so}">📘 Học Module ${m.so}</a></div>`).join("");
   return html;
 }
 
@@ -688,9 +714,17 @@ Object.assign(ACTIONS, {
   pdTemplate: (el) => {
     const k = el.dataset.val, tpl = TEMPLATES[k];
     const d = D.pd;
-    if ((d.mustHave.length || d.tieuChi.length) && !confirm(`Dùng mẫu “${tpl.ten}” sẽ THAY loại cứng, tiêu chí và mục tiêu đang có. Tiếp tục?`)) return;
     const t = withIds(clone({ mustHave: tpl.mustHave, tieuChi: tpl.tieuChi }));
-    d.mustHave = t.mustHave; d.tieuChi = t.tieuChi; d.mucTieu = clone(tpl.mucTieu); d.nhom = k;
+    if (el.dataset.tab === "scorecard") {
+      // Bước 4: chỉ thay tiêu chí chấm điểm
+      if (d.tieuChi.length && !confirm(`Dùng mẫu “${tpl.ten}” sẽ THAY các tiêu chí đang có. Tiếp tục?`)) return;
+      d.tieuChi = t.tieuChi;
+    } else {
+      // Bước 1: thay loại cứng + mục tiêu; tiêu chí chỉ điền nếu đang trống (để dành cho Bước 4)
+      if ((d.mustHave.length || str(d.mucTieu.d30)) && !confirm(`Dùng mẫu “${tpl.ten}” sẽ THAY loại cứng và mục tiêu đang có. Tiếp tục?`)) return;
+      d.mustHave = t.mustHave; d.mucTieu = clone(tpl.mucTieu); d.nhom = k;
+      if (!d.tieuChi.length) d.tieuChi = t.tieuChi;
+    }
     persistDraft("pd"); render();
     toast("Đã điền mẫu ✓ — nhớ sửa [chỗ trong ngoặc] cho đúng cửa hàng");
   },
@@ -749,31 +783,41 @@ Object.assign(ACTIONS, {
   },
   pdCopyHM: () => {
     const d = D.pd;
-    if (!d.tieuChi.length) { toast("Chưa có tiêu chí nào để gửi"); return; }
+    if (!d.mustHave.length && !d.tieuChi.length) { toast("Chưa có loại cứng / tiêu chí nào để gửi"); return; }
     copyText(portraitText(d, d));
   },
-  pdSave: () => {
+  pdSave: (el) => {
+    const mode = el.dataset.mode === "scorecard" ? "scorecard" : "chandung";
     const d = D.pd;
-    if (!str(d.tenViTri)) { toast("Nhập tên vị trí trước nhé"); const el = $('[data-bind="tenViTri"]'); if (el) { el.focus(); el.scrollIntoView({ block: "center" }); } return; }
+    if (!str(d.tenViTri)) { toast("Nhập tên vị trí trước nhé"); const f = $('[data-bind="tenViTri"]'); if (f) { f.focus(); f.scrollIntoView({ block: "center" }); } return; }
     d.mustHave = d.mustHave.filter(m => str(m.ten));
-    d.tieuChi = d.tieuChi.filter(t => str(t.ten));
-    if (!d.tieuChi.length) { render(); toast("Cần ít nhất 1 tiêu chí chấm điểm"); return; }
-    const w = weightCheck(d.tieuChi);
-    if (!w.ok) {
-      render();
-      const box = $("#pdWeight"); if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
-      toast("Trọng số chưa đúng (tổng 100, mỗi cái 10–40%). Bấm “Tự cân lại”.");
-      return;
+    const named = d.tieuChi.filter(t => str(t.ten));
+    if (mode === "scorecard") {
+      d.tieuChi = named;
+      if (!d.tieuChi.length) { render(); toast("Cần ít nhất 1 tiêu chí chấm điểm"); return; }
+      if (!weightCheck(d.tieuChi).ok) {
+        render();
+        const box = $("#pdWeight"); if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
+        toast("Trọng số chưa đúng (tổng 100, mỗi cái 10–40%). Bấm “Tự cân lại”.");
+        return;
+      }
     }
-    const allText = JSON.stringify([d.tenViTri, d.moTaHM, d.mustHave, d.tieuChi]);
+    const allText = JSON.stringify(mode === "scorecard" ? [d.tieuChi] : [d.tenViTri, d.moTaHM, d.mucTieu, d.mustHave]);
     const hits = legalCheck(allText);
-    if (hits.length && !confirm(`⚖️ Chân dung có từ thuộc nhóm cấm: ${hits.map(h => h.key).join(", ")}.\nKhông được dùng để đánh giá/loại ứng viên (Điều 3 khoản 8, BLLĐ 2019).\n\nBấm Huỷ để sửa (khuyên dùng), hoặc OK để vẫn lưu.`)) { render(); return; }
+    if (hits.length && !confirm(`⚖️ Có từ thuộc nhóm cấm: ${hits.map(h => h.key).join(", ")}.\nKhông được dùng để đánh giá/loại ứng viên (Điều 3 khoản 8, BLLĐ 2019).\n\nBấm Huỷ để sửa (khuyên dùng), hoặc OK để vẫn lưu.`)) { render(); return; }
     const posId = d.posId || genId("P");
-    const chanDung = { khuVuc: str(d.khuVuc), moTaHM: str(d.moTaHM), mucTieu: d.mucTieu, mustHave: d.mustHave, tieuChi: d.tieuChi.map(t => Object.assign({}, t, { trongSo: +t.trongSo })) };
-    Store.save({ action: "savePosition", position: { posId, tenViTri: str(d.tenViTri), nhom: d.nhom, chanDung, scorecard: buildScorecard(chanDung), nguoiCapNhat: getUser() } });
+    const old = findPos(posId);
+    const chanDung = { khuVuc: str(d.khuVuc), moTaHM: str(d.moTaHM), mucTieu: d.mucTieu, mustHave: d.mustHave, tieuChi: (mode === "scorecard" ? d.tieuChi : d.tieuChi).map(t => Object.assign({}, t, { trongSo: +t.trongSo || 0 })) };
+    const position = { posId, tenViTri: str(d.tenViTri), nhom: d.nhom, chanDung, nguoiCapNhat: getUser() };
+    // Scorecard: lưu khi ở Bước 4, hoặc cập nhật lại (loại cứng mới) nếu vị trí đã có scorecard hợp lệ
+    if (mode === "scorecard" || (old && hasScorecard(old) && weightCheck(chanDung.tieuChi.filter(t => str(t.ten))).ok)) {
+      chanDung.tieuChi = chanDung.tieuChi.filter(t => str(t.ten));
+      position.scorecard = buildScorecard(chanDung);
+    }
+    Store.save({ action: "savePosition", step: mode, position });
     clearDraft(D.pdKey); D.pd = null; D.pdKey = null;
-    toast("Đã lưu vị trí + phiếu điểm ✓");
-    go("#/positions");
+    toast(mode === "scorecard" ? "Đã lưu scorecard ✓" : "Đã lưu chân dung ✓");
+    goNextAfter(posId, mode === "scorecard" ? "m4" : "m1", `#/position/${encodeURIComponent(posId)}?tab=${mode}`);
   },
   pdDelete: () => {
     const d = D.pd;

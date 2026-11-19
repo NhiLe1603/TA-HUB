@@ -660,6 +660,110 @@ a.tool-card:hover { border-color: var(--primary); }
 .log-main { min-width: 0; word-break: break-word; }
 .log-main .small { display: block; }
 
+/* ================= 8 MODULE · KHOÁ · LUỒNG BƯỚC · KPI · E-LEARNING ================= */
+.bottom-nav { grid-template-columns: repeat(4, 1fr); }
+@media (min-width: 900px) {
+  .app { grid-template-columns: 290px 1fr; }
+  .sidebar { overflow-y: auto; }
+  .side-nav { gap: 0; }
+  .side-nav .nav-top {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--text); font-weight: 600;
+  }
+  .side-nav .nav-top:hover { background: var(--bg); }
+  .side-nav .nav-top.active { background: var(--primary-soft); color: var(--primary); }
+}
+.nav-sec { margin: 14px 10px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
+.nav-mod { padding: 6px 4px 4px; border-radius: 10px; }
+.nav-mod-h { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 2px 6px 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); line-height: 1.35; }
+.nav-mod.all-locked .nav-mod-h { color: var(--faint); }
+.mnum {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+  background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 800;
+}
+.mnum.big { width: 34px; height: 34px; border-radius: 10px; font-size: 16px; }
+.nav-mod.all-locked .mnum { background: var(--bg); color: var(--faint); }
+.side-nav a.nav-sub, .side-nav .nav-sub {
+  display: flex; align-items: center; gap: 8px; margin-left: 30px; padding: 6px 8px; border-radius: 8px;
+  font-size: 13.5px; font-weight: 500; color: var(--text);
+}
+.side-nav a.nav-sub:hover { background: var(--bg); }
+.side-nav a.nav-sub.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.side-nav .nav-sub .ico { font-size: 14px; width: 18px; }
+.nav-sub.locked { color: var(--faint) !important; cursor: not-allowed; }
+.soon-tag { margin-left: auto; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--bg); color: var(--faint); white-space: nowrap; }
+
+.locked-page { text-align: center; padding: 30px 18px; }
+.lock-ico { font-size: 46px; margin-bottom: 6px; }
+.mod-card .mod-h { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; }
+.tool-card.soon-card { cursor: not-allowed; }
+
+/* Thanh bước của 1 vị trí */
+.wf-bar { display: flex; gap: 4px; overflow-x: auto; padding: 2px 0 10px; margin-bottom: 6px; scrollbar-width: none; }
+.wf-bar::-webkit-scrollbar { display: none; }
+.wf-step {
+  flex: 1 0 auto; min-width: 84px; max-width: 150px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); text-align: center;
+}
+.wf-step.cur { border-color: var(--primary); background: var(--primary-soft); }
+.wf-step.lock { opacity: .55; cursor: not-allowed; }
+.wf-dot {
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  border: 2px solid var(--line-strong); color: var(--muted); background: var(--card);
+}
+.wf-step.ok .wf-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+.wf-step.cur .wf-dot { border-color: var(--primary); color: var(--primary); }
+.wf-step.ok.cur .wf-dot { border-color: var(--ok); color: #fff; box-shadow: 0 0 0 3px var(--primary-soft); }
+.wf-lbl { font-size: 11.5px; line-height: 1.25; }
+.mini-steps { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+.ms {
+  width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  background: var(--bg); color: var(--muted); border: 1px solid var(--line);
+}
+.ms.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+.ms.lock { font-size: 9px; opacity: .6; }
+.ms.cur { border-color: var(--primary); color: var(--primary); }
+.prog-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.prog-row:last-child { border-bottom: 0; }
+.prog-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.prog-main a { color: var(--text); }
+.next-card { display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: start; border: 2px solid var(--primary); background: var(--primary-soft); }
+.next-card.done { border-color: var(--ok); background: var(--ok-soft); }
+.next-ico { font-size: 28px; }
+.from-banner { margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent); font-size: 14px; }
+
+/* KPI */
+.month-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.month-bar b { font-size: 16px; min-width: 120px; text-align: center; }
+.row-on td { background: var(--primary-soft); }
+.cell-kpi { font-weight: 700; }
+.cell-kpi.ok { color: var(--ok); } .cell-kpi.warn { color: var(--warn); } .cell-kpi.bad { color: var(--bad); }
+.kpi-rates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.kpi-rates div { padding: 10px; border-radius: 10px; background: var(--bg); display: flex; flex-direction: column; }
+.kpi-rates .lbl { font-size: 12px; color: var(--muted); }
+.kpi-rates b { font-size: 20px; }
+.kpi-head, .kpi-row { display: grid; grid-template-columns: 1fr 76px 76px; gap: 8px; align-items: start; }
+.kpi-head { font-size: 12px; font-weight: 600; color: var(--muted); padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.kpi-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.kpi-row .input { min-height: 40px; padding: 6px 8px; text-align: center; }
+.kpi-name { min-width: 0; }
+.kpi-bar { grid-column: 1 / -1; position: relative; height: 18px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.kpi-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; }
+.kpi-bar.ok i { background: color-mix(in srgb, var(--ok) 45%, transparent); }
+.kpi-bar.warn i { background: color-mix(in srgb, var(--warn) 45%, transparent); }
+.kpi-bar.bad i { background: color-mix(in srgb, var(--bad) 40%, transparent); }
+.kpi-bar span { position: relative; font-size: 11.5px; font-weight: 700; padding-left: 8px; line-height: 18px; }
+
+/* E-learning */
+.docs { display: grid; gap: 6px; }
+.doc { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); }
+.doc:hover { border-color: var(--primary); }
+.skill { padding: 12px; border-radius: 12px; border: 1px solid var(--line); }
+.sop { display: flex; flex-direction: column; align-items: stretch; }
+.sop-step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--primary-soft); border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent); font-size: 14px; }
+.sop-n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--primary); color: #fff; font-weight: 700; font-size: 13px; }
+.sop-arrow { text-align: center; color: var(--primary); font-weight: 700; line-height: 1.2; padding: 2px 0; }
+.lesson-head .mnum.big { justify-self: center; }
+
 /* Placeholder */
 .soon { text-align: center; padding: 30px 16px; }
 .soon .ico { font-size: 42px; }
