@@ -45,6 +45,7 @@ Store.describe = function (body) {
   }
   if (body.action === "saveKpi") {
     const k = body.kpi || {};
+    if (k.kpiId === "__CONFIG__") return Object.assign(base, { hanhDong: "Cập nhật bộ KPI", loai: "kpi", doiTuongId: k.kpiId, ten: "Bộ KPI của team", chiTiet: `${(asObj(k.chiTieu).defs || []).length} chỉ số · ${(asObj(k.chiTieu).rates || []).length} tỷ lệ` });
     return Object.assign(base, { hanhDong: "Cập nhật KPI", loai: "kpi", doiTuongId: k.kpiId, ten: `${k.ta} · ${kpiMonthLabel(k.thang)}`, chiTiet: "" });
   }
   if (body.action === "deletePosition") {
@@ -58,7 +59,7 @@ Store.describe = function (body) {
 const ACT_ICON = {
   "Thêm ứng viên": "➕", "Lọc CV": "📄", "Sơ vấn": "📞", "Đổi trạng thái": "🔀", "Sửa ghi chú": "📝",
   "Sửa thông tin ứng viên": "✏️", "Xoá ứng viên": "🗑", "Tạo vị trí": "💼", "Tạo vị trí + phiếu điểm": "💼",
-  "Cập nhật chân dung & phiếu điểm": "📐", "Tạo vị trí + chân dung": "🎯", "Cập nhật chân dung": "🎯", "Lưu scorecard": "📐", "Cập nhật KPI": "📊", "Lưu tin đăng": "✍️", "Lưu kế hoạch nguồn": "📣", "Sửa vị trí": "✏️", "Xoá vị trí": "🗑"
+  "Cập nhật chân dung & phiếu điểm": "📐", "Tạo vị trí + chân dung": "🎯", "Cập nhật chân dung": "🎯", "Lưu scorecard": "📐", "Cập nhật KPI": "📊", "Cập nhật bộ KPI": "⚙️", "Lưu tin đăng": "✍️", "Lưu kế hoạch nguồn": "📣", "Sửa vị trí": "✏️", "Xoá vị trí": "🗑"
 };
 const dayKey = d => { const x = new Date(d); return isNaN(x) ? "" : `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`; };
 function dayLabel(d) {

@@ -753,6 +753,11 @@ a.tool-card:hover { border-color: var(--primary); }
 .kpi-bar.bad i { background: color-mix(in srgb, var(--bad) 40%, transparent); }
 .kpi-bar span { position: relative; font-size: 11.5px; font-weight: 700; padding-left: 8px; line-height: 18px; }
 
+.kcfg-grid { display: grid; grid-template-columns: 1fr 110px 90px; gap: 8px; }
+.kcfg-grid.two { grid-template-columns: 1fr 1fr; }
+@media (max-width: 520px) { .kcfg-grid { grid-template-columns: 1fr 1fr; } .kcfg-grid > :first-child { grid-column: 1 / -1; } }
+.icon-btn:disabled { opacity: .3; cursor: default; }
+
 /* E-learning */
 .docs { display: grid; gap: 6px; }
 .doc { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); }
