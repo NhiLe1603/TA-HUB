@@ -73,6 +73,12 @@ function kpiConfig() {
   return c && Array.isArray(c.defs) && c.defs.length ? { defs: c.defs, rates: Array.isArray(c.rates) ? c.rates : [], custom: true, by: rec.nguoiCapNhat, at: rec.ngayCapNhat } : clone(DEFAULT_KPI_CONFIG);
 }
 const taRecords = () => Store.kpi.filter(x => String(x.kpiId) !== KPI_CONFIG_ID);
+/** Chỉ số áp dụng cho TA nào: apply rỗng = cả team, có tên = chỉ những người đó */
+const appliesTo = (def, ta) => !Array.isArray(def.apply) || !def.apply.length || def.apply.includes(ta);
+const defsFor = (defs, ta) => defs.filter(d => appliesTo(d, ta));
+const rateFor = (rate, defs, ta) => { const a = defs.find(d => d.k === rate.num), b = defs.find(d => d.k === rate.den); return !!a && !!b && appliesTo(a, ta) && appliesTo(b, ta); };
+const allTAs = () => Array.from(new Set([...TA_NAMES, ...taRecords().map(x => str(x.ta)), getUser()].filter(Boolean)));
+const applyLabel = def => !Array.isArray(def.apply) || !def.apply.length ? "Cả team" : "Riêng: " + def.apply.join(", ");
 function autoCount(ta, m, def) {
   const src = AUTO_SOURCES[def.auto || ""];
   return src && src.test ? Store.logs.filter(l => str(l.ta) === ta && inMonth(l, m) && src.test(l)).length : null;
@@ -95,10 +101,10 @@ function rateCls(v, rate) {
   return moc !== null ? (v >= moc ? "ok" : "bad") : "";
 }
 /** Điểm KPI tổng = Σ(trọng số × % hoàn thành, tối đa 120%) ÷ Σ trọng số các KPI có đủ số */
-function kpiScore(rec, defs) {
+function kpiScore(rec, defs, ta) {
   const ct = asObj(rec && rec.chiTieu), tt = asObj(rec && rec.thucTe);
   let s = 0, w = 0;
-  defs.forEach(d => {
+  defs.filter(d => !ta || appliesTo(d, ta)).forEach(d => {
     const wt = +d.w || 0; if (!wt) return;
     const p = kpiAchieve(numOrNull(tt[d.k]), numOrNull(ct[d.k]), d.lower);
     if (p === null) return;
@@ -124,7 +130,8 @@ function viewKpi() {
   if (!UI6.ta) UI6.ta = getUser() || TA_NAMES[0];
   const m = UI6.month, cfg = kpiConfig(), defs = cfg.defs, rates = cfg.rates;
   const hasW = defs.some(d => +d.w > 0);
-  const tas = Array.from(new Set([...TA_NAMES, ...taRecords().map(x => str(x.ta)), getUser()].filter(Boolean)));
+  const tas = allTAs();
+  const nPrivate = defs.filter(d => Array.isArray(d.apply) && d.apply.length).length;
   let html = pageHead("📊 Module 8 · KPI từng TA", "đặt <b>chỉ tiêu</b> và theo dõi <b>kết quả thực tế</b> theo tháng cho từng TA. Xanh = đạt, cam = gần đạt (≥70%), đỏ = chưa đạt. Bộ KPI do bạn tự xây ở nút <b>⚙️ Tuỳ chỉnh bộ KPI</b>.");
   html += kpiBackendBanner();
   if (!Store.state.hasData && isConnected()) return html + loadingBlock();
@@ -133,36 +140,41 @@ function viewKpi() {
     <b>${kpiMonthLabel(m)}</b><button class="btn sm" data-act="kpiMonth" data-d="1" type="button">›</button>
     ${m !== monthKey(new Date()) ? `<button class="btn sm ghost" data-act="kpiMonth" data-d="0" type="button">Tháng này</button>` : ""}
     <button class="btn sm" style="margin-left:auto" data-act="kpiEdit" type="button">⚙️ Tuỳ chỉnh bộ KPI</button></div>
-    <p class="small muted" style="margin:-6px 0 12px">Bộ KPI: <b>${defs.length} chỉ số</b>${rates.length ? `, ${rates.length} tỷ lệ` : ""} · ${cfg.custom ? `đã tuỳ chỉnh${cfg.by ? " bởi " + esc(cfg.by) : ""}` : "đang dùng bộ mặc định"}</p>`;
+    <p class="small muted" style="margin:-6px 0 12px">Bộ KPI: <b>${defs.length} chỉ số</b>${nPrivate ? ` (${defs.length - nPrivate} cả team · ${nPrivate} riêng từng người)` : ""}${rates.length ? `, ${rates.length} tỷ lệ` : ""} · ${cfg.custom ? `đã tuỳ chỉnh${cfg.by ? " bởi " + esc(cfg.by) : ""}` : "đang dùng bộ mặc định"}</p>`;
 
   // Tổng quan cả team
   html += `<div class="card"><div class="card-head"><h2>Tổng quan team</h2><button class="btn sm" data-act="kpiCopy" type="button">📋 Copy báo cáo</button></div>
     <div class="table-wrap"><table class="tbl"><thead><tr><th class="sticky">TA</th>${hasW ? `<th>Điểm KPI</th>` : ""}
       ${rates.map(r => `<th><span class="th-name">${esc(r.t)}</span></th>`).join("")}
-      ${defs.map(d => `<th><span class="th-name">${esc(d.t)}</span><span class="th-sub">thực tế/chỉ tiêu</span></th>`).join("")}</tr></thead><tbody>
+      ${defs.map(d => `<th><span class="th-name">${esc(d.t)}</span><span class="th-sub">${Array.isArray(d.apply) && d.apply.length ? "🔸 riêng" : "thực tế/chỉ tiêu"}</span></th>`).join("")}</tr></thead><tbody>
     ${tas.map(t => {
       const r = kpiRec(t, m), tt = asObj(r && r.thucTe), ct = asObj(r && r.chiTieu);
-      const sc = kpiScore(r, defs);
+      const sc = kpiScore(r, defs, t);
       return `<tr class="${UI6.ta === t ? "row-on" : ""}"><td class="sticky"><a href="#" data-act="kpiTA" data-val="${esc(t)}"><b>${esc(t)}</b></a>${r ? "" : `<div class="small muted">chưa nhập</div>`}</td>
         ${hasW ? `<td class="cell-kpi ${achieveCls(sc)}">${sc === null ? "—" : fmtPct(sc)}</td>` : ""}
-        ${rates.map(rt => { const v = rateOf(r, rt); return `<td class="cell-kpi ${rateCls(v, rt)}">${fmtPct(v)}</td>`; }).join("")}
-        ${defs.map(d => { const a = numOrNull(tt[d.k]), g = numOrNull(ct[d.k]); return `<td class="cell-kpi ${achieveCls(kpiAchieve(a, g, d.lower))}">${fmtNum(a)}${g !== null ? `<span class="muted">/${fmtNum(g)}</span>` : ""}</td>`; }).join("")}</tr>`;
+        ${rates.map(rt => { if (!rateFor(rt, defs, t)) return `<td class="na" title="Không áp dụng cho ${esc(t)}">·</td>`; const v = rateOf(r, rt); return `<td class="cell-kpi ${rateCls(v, rt)}">${fmtPct(v)}</td>`; }).join("")}
+        ${defs.map(d => { if (!appliesTo(d, t)) return `<td class="na" title="Không áp dụng cho ${esc(t)}">·</td>`; const a = numOrNull(tt[d.k]), g = numOrNull(ct[d.k]); return `<td class="cell-kpi ${achieveCls(kpiAchieve(a, g, d.lower))}">${fmtNum(a)}${g !== null ? `<span class="muted">/${fmtNum(g)}</span>` : ""}</td>`; }).join("")}</tr>`;
     }).join("")}</tbody></table></div>
-    <p class="small muted" style="margin-top:8px">${hasW ? "Điểm KPI = trung bình có trọng số của % hoàn thành từng chỉ số (tối đa 120%/chỉ số). " : ""}Bấm tên TA để xem/nhập chi tiết.</p></div>`;
+    <p class="small muted" style="margin-top:8px">${hasW ? "Điểm KPI = trung bình có trọng số của % hoàn thành các chỉ số <b>áp dụng cho người đó</b> (tối đa 120%/chỉ số). " : ""}“·” = chỉ số không áp dụng cho người này. Bấm tên TA để xem/nhập chi tiết.</p></div>`;
 
-  // Chi tiết 1 TA
+  // Chi tiết 1 TA — chỉ các chỉ số áp dụng cho người đó
   const ta = UI6.ta, rec = kpiRec(ta, m), ct = asObj(rec && rec.chiTieu), tt = asObj(rec && rec.thucTe);
-  const score = kpiScore(rec, defs);
-  html += `<div class="card"><div class="card-head"><h2>Chi tiết: ${esc(ta)} · ${kpiMonthLabel(m)}</h2></div>
+  const myDefs = defsFor(defs, ta), myRates = rates.filter(r => rateFor(r, defs, ta));
+  const myHasW = myDefs.some(d => +d.w > 0);
+  const myW = myDefs.reduce((s, d) => s + (+d.w || 0), 0);
+  const score = kpiScore(rec, defs, ta);
+  html += `<div class="card"><div class="card-head"><h2>Chi tiết: ${esc(ta)} · ${kpiMonthLabel(m)}</h2>
+      <button class="btn sm" data-act="kcfgAddFor" data-ta="${esc(ta)}" type="button">＋ KPI riêng cho ${esc(ta)}</button></div>
     <div class="chips scroll" style="margin-bottom:12px">${tas.map(t => `<button class="chip ${t === ta ? "on" : ""}" data-act="kpiTA" data-val="${esc(t)}" type="button">${esc(t)}</button>`).join("")}</div>
-    ${hasW || rates.length ? `<div class="kpi-rates">${hasW ? `<div><span class="lbl">Điểm KPI tổng</span><b class="verdict ${achieveCls(score)}">${score === null ? "—" : fmtPct(score)}</b><span class="small muted">theo trọng số</span></div>` : ""}
-      ${rates.map(r => { const v = rateOf(rec, r); return `<div><span class="lbl">${esc(r.t)}</span><b class="verdict ${rateCls(v, r)}">${fmtPct(v)}</b><span class="small muted">${numOrNull(r.muc) !== null ? "mục tiêu " + fmtNum(+r.muc) + "%" : ""}${numOrNull(r.moc) !== null ? " · mốc " + fmtNum(+r.moc) + "%" : ""}</span></div>`; }).join("")}</div>` : ""}
+    <p class="small muted" style="margin-bottom:10px">${esc(ta)} có <b>${myDefs.length}</b> chỉ số (${myDefs.filter(d => !(Array.isArray(d.apply) && d.apply.length)).length} chung · ${myDefs.filter(d => Array.isArray(d.apply) && d.apply.length).length} riêng)${myHasW ? ` · tổng trọng số <b class="${myW === 100 ? "verdict ok" : "verdict warn"}">${myW}%</b>` : ""}.</p>
+    ${myHasW || myRates.length ? `<div class="kpi-rates">${myHasW ? `<div><span class="lbl">Điểm KPI tổng</span><b class="verdict ${achieveCls(score)}">${score === null ? "—" : fmtPct(score)}</b><span class="small muted">theo trọng số</span></div>` : ""}
+      ${myRates.map(r => { const v = rateOf(rec, r); return `<div><span class="lbl">${esc(r.t)}</span><b class="verdict ${rateCls(v, r)}">${fmtPct(v)}</b><span class="small muted">${numOrNull(r.muc) !== null ? "mục tiêu " + fmtNum(+r.muc) + "%" : ""}${numOrNull(r.moc) !== null ? " · mốc " + fmtNum(+r.moc) + "%" : ""}</span></div>`; }).join("")}</div>` : ""}
     <div class="kpi-head"><span>Chỉ số</span><span>Chỉ tiêu</span><span>Thực tế</span></div>
-    ${defs.map(def => {
+    ${myDefs.map(def => {
       const a = numOrNull(tt[def.k]), tg = numOrNull(ct[def.k]);
       const p = kpiAchieve(a, tg, def.lower);
       const auto = autoCount(ta, m, def);
-      return `<div class="kpi-row"><div class="kpi-name"><b>${esc(def.t)}</b> <span class="small muted">(${esc(def.unit || "")}${def.lower ? " · càng thấp càng tốt" : ""}${+def.w ? " · trọng số " + def.w + "%" : ""})</span>
+      return `<div class="kpi-row"><div class="kpi-name"><b>${esc(def.t)}</b>${Array.isArray(def.apply) && def.apply.length ? ` <span class="badge" style="--c:var(--warn)">riêng</span>` : ""} <span class="small muted">(${esc(def.unit || "")}${def.lower ? " · càng thấp càng tốt" : ""}${+def.w ? " · trọng số " + def.w + "%" : ""})</span>
           ${str(def.d) ? `<div class="small muted">${esc(def.d)}</div>` : ""}
           ${auto ? `<div class="small">📱 App ghi nhận: <b>${auto}</b> <button class="btn sm ghost" data-act="kpiUseAuto" data-k="${esc(def.k)}" data-v="${auto}" type="button">Dùng số này</button></div>` : ""}</div>
         <input class="input" type="number" step="any" min="0" data-kpi="chiTieu.${esc(def.k)}" data-keep="kpi:${esc(ta)}:${m}:ct:${esc(def.k)}" value="${tg ?? ""}" placeholder="—" aria-label="Chỉ tiêu ${esc(def.t)}">
@@ -190,7 +202,7 @@ function viewKpi() {
 function viewKpiEditor() {
   if (!UI6.cfg) { const c = kpiConfig(); UI6.cfg = { defs: clone(c.defs), rates: clone(c.rates) }; }
   const c = UI6.cfg;
-  const wTotal = c.defs.reduce((s, d) => s + (+d.w || 0), 0);
+  const tasAll = allTAs();
   const kpiOpts = sel => `<option value="">— chọn —</option>` + c.defs.map(d => `<option value="${esc(d.k)}" ${d.k === sel ? "selected" : ""}>${esc(d.t || "(chưa đặt tên)")}</option>`).join("");
   const inp = (path, val, ph, type = "text") => `<input class="input" type="${type}" ${type === "number" ? 'step="any"' : ""} data-kcfg="${path}" value="${esc(val ?? "")}" placeholder="${esc(ph)}" autocomplete="off">`;
   let html = `<a class="back" href="#/kpi" data-act="kcfgCancel">← KPI</a>` + pageHead("⚙️ Tuỳ chỉnh bộ KPI",
@@ -198,10 +210,10 @@ function viewKpiEditor() {
   html += `<div class="banner" style="margin:0 0 14px;display:block;font-size:13.5px">💡 Đổi tên/đơn vị không làm mất số liệu cũ. <b>Xoá</b> 1 chỉ số chỉ ẩn nó khỏi bảng — số liệu cũ vẫn nằm trên Sheet, thêm lại sẽ không hiện lại (vì là chỉ số mới).</div>`;
 
   // Chỉ số
-  html += `<div class="card"><div class="card-head"><h2>Chỉ số KPI (${c.defs.length})</h2>
-      <span class="badge" style="--c:${wTotal === 100 || wTotal === 0 ? "var(--ok)" : "var(--warn)"}">Tổng trọng số: ${wTotal}%</span></div>
-    <p class="small muted" style="margin-bottom:10px">Trọng số dùng để tính <b>Điểm KPI tổng</b>. Để 0 nếu chỉ số chỉ để theo dõi. Nên để tổng = 100%.</p>
-    ${c.defs.map((d, i) => `<div class="item-card">
+  html += `<div class="card"><div class="card-head"><h2>Chỉ số KPI (${c.defs.length})</h2></div>
+    <p class="small muted" style="margin-bottom:8px">Trọng số dùng để tính <b>Điểm KPI tổng</b> của từng người (chỉ tính các chỉ số áp dụng cho người đó). Để 0 nếu chỉ để theo dõi. Mỗi người nên có tổng = 100%:</p>
+    <div id="kcfgW">${kcfgWeightsHtml()}</div>
+    ${c.defs.map((d, i) => `<div class="item-card ${Array.isArray(d.apply) && d.apply.length ? "private" : ""}">
       <div class="item-head"><b>${i + 1}. ${esc(d.t || "Chỉ số mới")}</b><span class="btn-row" style="flex:0 0 auto;gap:2px">
         <button class="icon-btn" data-act="kcfgMove" data-i="${i}" data-d="-1" type="button" aria-label="Lên" ${i === 0 ? "disabled" : ""}>↑</button>
         <button class="icon-btn" data-act="kcfgMove" data-i="${i}" data-d="1" type="button" aria-label="Xuống" ${i === c.defs.length - 1 ? "disabled" : ""}>↓</button>
@@ -212,6 +224,10 @@ function viewKpiEditor() {
         <label class="field"><span class="small">Trọng số %</span>${inp(`defs.${i}.w`, d.w || 0, "0", "number")}</label>
       </div>
       <label class="field"><span class="small">Mô tả / cách tính</span>${inp(`defs.${i}.d`, d.d, "VD: Số người mới đi làm trong tháng")}</label>
+      <div class="field"><span class="field-label small">Áp dụng cho</span><div class="chips">
+        <button class="chip ${!(Array.isArray(d.apply) && d.apply.length) ? "on" : ""}" data-act="kcfgApply" data-i="${i}" data-val="" type="button">👥 Cả team</button>
+        ${tasAll.map(t => `<button class="chip ${Array.isArray(d.apply) && d.apply.includes(t) ? "on" : ""}" data-act="kcfgApply" data-i="${i}" data-val="${esc(t)}" type="button">${esc(t)}</button>`).join("")}</div>
+        <div class="small muted" style="margin-top:4px">Chọn 1 hoặc vài người = KPI riêng của họ. Bấm “Cả team” để áp dụng cho tất cả.</div></div>
       <div class="field"><span class="field-label small">Chiều tốt</span><div class="chips">
         <button class="chip ${!d.lower ? "on" : ""}" data-act="kcfgLower" data-i="${i}" data-val="0" type="button">⬆ Càng cao càng tốt</button>
         <button class="chip ${d.lower ? "on" : ""}" data-act="kcfgLower" data-i="${i}" data-val="1" type="button">⬇ Càng thấp càng tốt</button></div></div>
@@ -243,18 +259,27 @@ function viewKpiEditor() {
   return html;
 }
 
+/** Tổng trọng số theo từng người (chung + riêng) */
+function kcfgWeightsHtml() {
+  const c = UI6.cfg;
+  return `<div class="chips" style="margin-bottom:12px">${allTAs().map(t => {
+    const w = c.defs.filter(d => appliesTo(d, t)).reduce((s, d) => s + (+d.w || 0), 0);
+    return `<span class="badge" style="--c:${w === 100 || w === 0 ? "var(--ok)" : "var(--warn)"}">${esc(t)}: ${w}%</span>`;
+  }).join("")}</div>`;
+}
+
 function kpiReportText() {
   const m = UI6.month, { defs, rates } = kpiConfig();
-  const hasW = defs.some(d => +d.w > 0);
-  const tas = Array.from(new Set([...TA_NAMES, ...taRecords().map(x => str(x.ta))].filter(Boolean)));
+  const tas = allTAs();
   const lines = [`📊 BÁO CÁO KPI TUYỂN DỤNG — ${kpiMonthLabel(m).toUpperCase()}`, ``];
   tas.forEach(t => {
     const r = kpiRec(t, m);
     if (!r) { lines.push(`• ${t}: chưa nhập`); return; }
     const tt = asObj(r.thucTe), ct = asObj(r.chiTieu);
-    const head = [hasW ? `điểm KPI ${fmtPct(kpiScore(r, defs))}` : "", ...rates.map(rt => `${rt.t.toLowerCase()} ${fmtPct(rateOf(r, rt))}`)].filter(Boolean).join(", ");
+    const hasW = defsFor(defs, t).some(d => +d.w > 0);
+    const head = [hasW ? `điểm KPI ${fmtPct(kpiScore(r, defs, t))}` : "", ...rates.filter(rt => rateFor(rt, defs, t)).map(rt => `${rt.t.toLowerCase()} ${fmtPct(rateOf(r, rt))}`)].filter(Boolean).join(", ");
     lines.push(`• ${t}${head ? " — " + head : ""}`);
-    const parts = defs.map(d => { const a = numOrNull(tt[d.k]), g = numOrNull(ct[d.k]); return a === null && g === null ? null : `${d.t}: ${fmtNum(a)}${g !== null ? "/" + fmtNum(g) : ""}${d.unit ? " " + d.unit : ""}`; }).filter(Boolean);
+    const parts = defsFor(defs, t).map(d => { const a = numOrNull(tt[d.k]), g = numOrNull(ct[d.k]); return a === null && g === null ? null : `${d.t}: ${fmtNum(a)}${g !== null ? "/" + fmtNum(g) : ""}${d.unit ? " " + d.unit : ""}`; }).filter(Boolean);
     if (parts.length) lines.push(`   ${parts.join(" · ")}`);
     if (str(r.ghiChu)) lines.push(`   Ghi chú: ${str(r.ghiChu)}`);
   });
@@ -307,6 +332,25 @@ Object.assign(ACTIONS, {
     if (j < 0 || j >= a.length) return;
     [a[i], a[j]] = [a[j], a[i]]; render();
   },
+  kcfgApply: (el) => {
+    const d = UI6.cfg.defs[+el.dataset.i], t = el.dataset.val;
+    if (!t) d.apply = [];
+    else {
+      const cur = Array.isArray(d.apply) ? d.apply.slice() : [];
+      d.apply = cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t];
+    }
+    render();
+  },
+  /* Từ màn chi tiết 1 TA: mở tuỳ chỉnh và thêm sẵn 1 chỉ số riêng cho người đó */
+  kcfgAddFor: (el) => {
+    const ta = el.dataset.ta;
+    UI6.edit = true;
+    const c = kpiConfig(); UI6.cfg = { defs: clone(c.defs), rates: clone(c.rates) };
+    UI6.cfg.defs.push({ k: newKpiKey(), t: "", unit: "", d: "", lower: false, w: 0, auto: "", apply: [ta] });
+    render();
+    setTimeout(() => { const cards = $$(".item-card"); const last = cards[UI6.cfg.defs.length - 1]; if (last) { last.scrollIntoView({ block: "center" }); const f = last.querySelector("input"); if (f) f.focus(); } }, 60);
+    toast(`Đã thêm 1 chỉ số riêng cho ${ta} — đặt tên rồi bấm Lưu`);
+  },
   kcfgLower: (el) => { UI6.cfg.defs[+el.dataset.i].lower = el.dataset.val === "1"; render(); },
   kcfgRateAdd: () => { UI6.cfg.rates.push({ k: newKpiKey(), t: "", num: "", den: "", muc: null, moc: null, d: "" }); render(); },
   kcfgRateDel: (el) => { UI6.cfg.rates.splice(+el.dataset.i, 1); render(); },
@@ -324,8 +368,9 @@ Object.assign(ACTIONS, {
     const badRate = c.rates.find(r => !str(r.t) || !r.num || !r.den || r.num === r.den);
     if (badRate) { toast(`Tỷ lệ “${str(badRate.t) || "chưa đặt tên"}” cần tên, tử số và mẫu số khác nhau`); return; }
     c.rates.forEach(r => { r.t = str(r.t); r.muc = numOrNull(r.muc); r.moc = numOrNull(r.moc); });
-    const wTotal = c.defs.reduce((s, d) => s + d.w, 0);
-    if (wTotal && wTotal !== 100 && !confirm(`Tổng trọng số đang là ${wTotal}% (nên = 100%). Vẫn lưu?`)) return;
+    c.defs.forEach(d => { if (!Array.isArray(d.apply)) d.apply = []; });
+    const off = allTAs().map(t => ({ t, w: c.defs.filter(d => appliesTo(d, t)).reduce((s, d) => s + d.w, 0) })).filter(x => x.w && x.w !== 100);
+    if (off.length && !confirm(`Tổng trọng số chưa = 100% với: ${off.map(x => `${x.t} (${x.w}%)`).join(", ")}.\nVẫn lưu?`)) return;
     Store.save({ action: "saveKpi", kpi: { kpiId: KPI_CONFIG_ID, ta: "", thang: "", chiTieu: { defs: c.defs, rates: c.rates }, thucTe: {}, ghiChu: "Bộ KPI của team", nguoiCapNhat: getUser() } });
     UI6.edit = false; UI6.cfg = null;
     toast("Đã lưu bộ KPI cho cả team ✓");
@@ -340,10 +385,7 @@ function kcfgInput(ev) {
   let v = el.value;
   if (el.type === "number") v = v === "" ? null : Number(v);
   setPath(UI6.cfg, el.dataset.kcfg, v);
-  if (/^defs\.\d+\.w$/.test(el.dataset.kcfg)) {
-    const total = UI6.cfg.defs.reduce((s, d) => s + (+d.w || 0), 0);
-    const b = $(".card-head .badge"); if (b) { b.textContent = `Tổng trọng số: ${total}%`; b.style.setProperty("--c", total === 100 || total === 0 ? "var(--ok)" : "var(--warn)"); }
-  }
+  if (/^defs\.\d+\.w$/.test(el.dataset.kcfg)) { const b = $("#kcfgW"); if (b) b.innerHTML = kcfgWeightsHtml(); }
 }
 document.addEventListener("input", kcfgInput);
 document.addEventListener("change", (ev) => { if (ev.target.tagName === "SELECT") kcfgInput(ev); });
